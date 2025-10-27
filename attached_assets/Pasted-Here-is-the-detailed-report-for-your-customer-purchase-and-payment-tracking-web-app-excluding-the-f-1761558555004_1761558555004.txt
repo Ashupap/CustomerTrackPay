@@ -1,0 +1,51 @@
+Here is the detailed report for your customer purchase and payment tracking web app, excluding the future notification and auto-invoice options, and with the dashboard as the first landing page post-login.
+
+Core Features
+Authentication Screen:
+Secure login for users with username/email and password, implemented via JWT token or session-based authentication to protect data and user access.​
+
+Post-Login Dashboard:
+After successful login, users are landed directly on the dashboard showing all customers and their current details, including upcoming payments based on purchase and payment terms. The dashboard provides quick overviews without requiring additional navigation.​
+
+Customer Details Management:
+Users can add and edit detailed customer information such as name, email, phone, company, product, purchase date, price, payment terms, and initial payment. This supports multiple customers and tracks payment schedules individually.​
+
+Payment Tracking:
+The system calculates and displays next payment dates and amounts dynamically based on payment terms. Payment history per customer is viewable for clarity and record-keeping.​
+
+Recommended Architecture
+Frontend:
+Use React or similar frameworks to build a responsive and user-friendly UI. The dashboard should have filters/search and customer-specific views.​
+
+Backend:
+Implement REST APIs using Node.js with Express or Python with FastAPI, connected to a relational database like PostgreSQL or MySQL for reliable and efficient data storage.​
+
+Authentication Security:
+Token-based authentication (JWT recommended) ensuring secure access control.​
+
+Data Model:
+Normalize data with tables for Users, Customers, Purchases, and Payments to ensure concise and accurate payment tracking.​
+
+Key Best Practices
+Responsive and Mobile-First Design:
+Ensure the app works smoothly on any device with minimal loading time and clear UI layouts.​
+
+Clean UX on Dashboard:
+Display only relevant customer details and next payment alerts, with intuitive navigation so users can quickly find or update customer information.​
+
+Security:
+Enforce HTTPS, input validation, role-based access controls, and secure password policies to protect user and financial data.​
+
+Testing:
+Unit and integration tests covering authentication, data handling, and dashboard functionality to avoid bugs and errors during usage.​
+
+Simplified User Flow
+User opens app, lands on login screen.
+
+On successful login, user is redirected to the dashboard.
+
+User views customer list with payment schedules.
+
+User can add or update customer and purchase/payment information.
+
+Dashboard reflects updated payment statuses dynamically.

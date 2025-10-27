@@ -9,6 +9,14 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 - **Last Updated**: October 27, 2025
 
 ## Recent Changes
+- **October 27, 2025**: Dark Mode & Login Screen Redesign
+  - Implemented full dark mode support with ThemeProvider and localStorage persistence
+  - Added theme toggle button (Moon/Sun icons) to both login page and dashboard
+  - Completely redesigned login screen with colorful gradient background (purple/pink/orange)
+  - Animated blob shapes on login page for visual interest
+  - Removed signup/register UI (minimal login-only design)
+  - Glassmorphic card effect with backdrop blur
+  - All components automatically adapt to light/dark themes
 - **October 27, 2025**: Payment Reminders & Alerts Feature
   - Added "Upcoming Payments (Next 7 Days)" alert section to dashboard
   - Implemented overdue payment count badge in KPI card
@@ -87,6 +95,14 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 
 ### Key Features
 
+#### Dark Mode
+- Full dark mode support with system-wide theme toggle
+- Theme persists in localStorage across sessions
+- Smooth transitions between light and dark modes
+- All components automatically adapt to current theme
+- Theme toggle accessible on both login page and dashboard
+- No theme flash on page load (uses useLayoutEffect)
+
 #### Authentication & Security
 - Secure password hashing using scrypt
 - Session-based authentication with express-session
@@ -94,6 +110,8 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 - Minimum 6-character password requirement
 - Username trimming and validation
 - Password data never exposed in API responses
+- Colorful, minimal login page with animated gradient background
+- No signup UI (backend registration endpoint still available for admin use)
 
 #### Dashboard
 - **KPI Cards**:
@@ -131,20 +149,23 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 ```
 ├── client/
 │   ├── src/
-│   │   ├── components/ui/        # Shadcn UI components
+│   │   ├── components/
+│   │   │   ├── ui/                    # Shadcn UI components
+│   │   │   ├── theme-provider.tsx     # Dark mode context provider
+│   │   │   └── theme-toggle.tsx       # Theme toggle button
 │   │   ├── hooks/
 │   │   │   └── use-auth.tsx      # Authentication hook
 │   │   ├── lib/
 │   │   │   ├── protected-route.tsx  # Route protection
 │   │   │   └── queryClient.ts    # TanStack Query setup
 │   │   ├── pages/
-│   │   │   ├── auth-page.tsx          # Login/Register
+│   │   │   ├── auth-page.tsx          # Login page (colorful, minimal)
 │   │   │   ├── dashboard-page.tsx     # Main dashboard
 │   │   │   ├── customer-detail-page.tsx
 │   │   │   ├── customer-form-page.tsx
 │   │   │   └── purchase-form-page.tsx
-│   │   ├── App.tsx               # Router configuration
-│   │   └── index.css             # Global styles & design tokens
+│   │   ├── App.tsx               # Router configuration with ThemeProvider
+│   │   └── index.css             # Global styles, dark mode variables, animations
 │   └── index.html
 ├── server/
 │   ├── auth.ts                   # Authentication setup

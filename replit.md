@@ -9,6 +9,19 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 - **Last Updated**: October 27, 2025
 
 ## Recent Changes
+- **October 27, 2025**: Payment Reminders & Alerts Feature
+  - Added "Upcoming Payments (Next 7 Days)" alert section to dashboard
+  - Implemented overdue payment count badge in KPI card
+  - Created API endpoints: GET /api/payments/upcoming and GET /api/payments/overdue-count
+  - Dashboard now shows upcoming payments with customer name (clickable), product, due date, and amount
+  - Blue-styled alert card for upcoming payments with hover effects
+  - Automatic filtering excludes overdue payments from upcoming section
+- **October 27, 2025**: CSV Bulk Customer Import
+  - Added CSV file upload functionality to dashboard
+  - Auto-delimiter detection supports comma, semicolon, tab-delimited files
+  - Flexible column mapping (name/customer_name, email, phone, company)
+  - Row-level validation with detailed error reporting
+  - Import results dialog shows total/success/failed counts with error details
 - **October 27, 2025**: SQLite Database Migration
   - Migrated from in-memory storage to SQLite for data persistence
   - Database file: ./paytrack.db

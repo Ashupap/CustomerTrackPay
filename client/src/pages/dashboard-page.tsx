@@ -1,0 +1,267 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { CustomerSummary } from "@shared/schema";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DollarSign, AlertCircle, Plus, Search, Eye, LogOut } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { format } from "date-fns";
+
+export default function DashboardPage() {
+  const [, setLocation] = useLocation();
+  const { user, logoutMutation } = useAuth();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterPeriod, setFilterPeriod] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const { data: customers, isLoading } = useQuery<CustomerSummary[]>({
+    queryKey: ["/api/customers"],
+  });
+
+  const { data: kpiData } = useQuery<{
+    totalPaid: number;
+    totalOverdue: number;
+  }>({
+    queryKey: ["/api/kpi", filterPeriod],
+  });
+
+  const filteredCustomers = customers?.filter((customer) => {
+    const matchesSearch =
+      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (statusFilter === "overdue") {
+      return matchesSearch && parseFloat(customer.totalOverdue) > 0;
+    }
+    if (statusFilter === "upcoming") {
+      return matchesSearch && customer.nextPaymentDate;
+    }
+    return matchesSearch;
+  });
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b bg-card">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary">
+                <DollarSign className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <h1 className="text-xl font-medium" data-testid="text-app-name">PayTrack</h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground" data-testid="text-username">
+                {user?.username}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                data-testid="button-logout"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-3xl font-medium tracking-tight mb-2" data-testid="text-page-title">Dashboard</h2>
+            <p className="text-base text-muted-foreground">Monitor your payment collections and customer accounts</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="shadow-md">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wide">
+                  Total Payments Received
+                </CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-baseline justify-between">
+                  <div>
+                    <div className="text-4xl font-bold" data-testid="text-total-paid">
+                      ${kpiData?.totalPaid.toLocaleString() ?? "0"}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Collected from customers
+                    </p>
+                  </div>
+                  <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+                    <SelectTrigger className="w-32" data-testid="select-period-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Time</SelectItem>
+                      <SelectItem value="year">This Year</SelectItem>
+                      <SelectItem value="month">This Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-md border-destructive/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wide">
+                  Total Overdue Amount
+                </CardTitle>
+                <AlertCircle className="h-4 w-4 text-destructive" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-destructive" data-testid="text-total-overdue">
+                  ${kpiData?.totalOverdue.toLocaleString() ?? "0"}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Requires immediate attention
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search customers..."
+                  className="pl-9"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  data-testid="input-search-customers"
+                />
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-40" data-testid="select-status-filter">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Customers</SelectItem>
+                    <SelectItem value="upcoming">With Upcoming</SelectItem>
+                    <SelectItem value="overdue">With Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={() => setLocation("/customers/new")} data-testid="button-add-customer">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Customer
+                </Button>
+              </div>
+            </div>
+
+            <Card className="shadow-sm">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs uppercase">Customer</TableHead>
+                    <TableHead className="text-xs uppercase">Company</TableHead>
+                    <TableHead className="text-xs uppercase">Contact</TableHead>
+                    <TableHead className="text-xs uppercase">Next Payment</TableHead>
+                    <TableHead className="text-xs uppercase">Amount Due</TableHead>
+                    <TableHead className="text-xs uppercase">Overdue</TableHead>
+                    <TableHead className="text-xs uppercase text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : filteredCustomers?.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-12">
+                        <div className="flex flex-col items-center gap-2">
+                          <p className="text-sm text-muted-foreground">No customers found</p>
+                          <Button variant="outline" size="sm" onClick={() => setLocation("/customers/new")}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add your first customer
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredCustomers?.map((customer) => (
+                      <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
+                        <TableCell className="font-medium">{customer.name}</TableCell>
+                        <TableCell className="text-sm">{customer.company || "-"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {customer.email || customer.phone || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {customer.nextPaymentDate
+                            ? format(new Date(customer.nextPaymentDate), "MMM dd, yyyy")
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-sm font-medium">
+                          {customer.nextPaymentAmount
+                            ? `$${parseFloat(customer.nextPaymentAmount).toLocaleString()}`
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {parseFloat(customer.totalOverdue) > 0 ? (
+                            <Badge variant="destructive" className="text-xs">
+                              ${parseFloat(customer.totalOverdue).toLocaleString()}
+                            </Badge>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/customers/${customer.id}`}>
+                            <Button variant="ghost" size="sm" data-testid={`button-view-${customer.id}`}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}

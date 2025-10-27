@@ -321,6 +321,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/payments/upcoming", requireAuth, async (req, res) => {
+    try {
+      const daysAhead = parseInt(req.query.days as string) || 7;
+      const upcomingPayments = await storage.getUpcomingPayments(req.user!.id, daysAhead);
+      res.json(upcomingPayments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/payments/overdue-count", requireAuth, async (req, res) => {
+    try {
+      const count = await storage.getOverduePaymentsCount(req.user!.id);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

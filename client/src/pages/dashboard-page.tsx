@@ -58,6 +58,14 @@ export default function DashboardPage() {
     queryKey: ["/api/kpi", filterPeriod],
   });
 
+  const { data: upcomingPayments } = useQuery<any[]>({
+    queryKey: ["/api/payments/upcoming"],
+  });
+
+  const { data: overdueData } = useQuery<{ count: number }>({
+    queryKey: ["/api/payments/overdue-count"],
+  });
+
   const filteredCustomers = customers?.filter((customer) => {
     const matchesSearch =
       customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -193,11 +201,18 @@ export default function DashboardPage() {
             </Card>
 
             <Card className="shadow-md border-destructive/20">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-semibold uppercase tracking-wide">
                   Total Overdue Amount
                 </CardTitle>
-                <AlertCircle className="h-4 w-4 text-destructive" />
+                <div className="flex items-center gap-2">
+                  {overdueData && overdueData.count > 0 && (
+                    <Badge variant="destructive" data-testid="badge-overdue-count">
+                      {overdueData.count} {overdueData.count === 1 ? 'payment' : 'payments'}
+                    </Badge>
+                  )}
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="text-4xl font-bold text-destructive" data-testid="text-total-overdue">
@@ -209,6 +224,50 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {upcomingPayments && upcomingPayments.length > 0 && (
+            <Card className="shadow-md border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  Upcoming Payments (Next 7 Days)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3" data-testid="list-upcoming-payments">
+                  {upcomingPayments.map((payment) => (
+                    <div
+                      key={payment.id}
+                      className="flex items-center justify-between p-3 bg-background rounded-md border hover-elevate"
+                      data-testid={`payment-upcoming-${payment.id}`}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={`/customers/${payment.customerId}`}
+                            className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                            data-testid={`link-customer-${payment.customerId}`}
+                          >
+                            {payment.customerName}
+                          </Link>
+                          <span className="text-sm text-muted-foreground">•</span>
+                          <span className="text-sm text-muted-foreground">{payment.product}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Due: {format(new Date(payment.dueDate), "MMM d, yyyy")}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-lg" data-testid={`text-amount-${payment.id}`}>
+                          ${parseFloat(payment.amount).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">

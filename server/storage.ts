@@ -36,6 +36,8 @@ export interface IStorage {
   
   getPayment(id: string): Promise<Payment | undefined>;
   getPaymentsByPurchase(purchaseId: string): Promise<Payment[]>;
+  getUpcomingPayments(userId: string, daysAhead: number): Promise<any[]>;
+  getOverduePaymentsCount(userId: string): Promise<number>;
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: string, payment: Partial<InsertPayment>): Promise<Payment | undefined>;
   
@@ -446,6 +448,59 @@ export class SqliteStorage implements IStorage {
     );
 
     return updated;
+  }
+
+  async getUpcomingPayments(userId: string, daysAhead: number): Promise<any[]> {
+    // Use current timestamp to exclude payments that are already overdue
+    // (payments with due date in the past)
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+    
+    const rows = this.db.prepare(`
+      SELECT 
+        p.id,
+        p.amount,
+        p.due_date,
+        p.status,
+        pur.product,
+        c.name as customer_name,
+        c.id as customer_id
+      FROM payments p
+      INNER JOIN purchases pur ON p.purchase_id = pur.id
+      INNER JOIN customers c ON pur.customer_id = c.id
+      WHERE c.user_id = ?
+        AND p.status != 'paid'
+        AND p.due_date > ?
+        AND p.due_date <= ?
+      ORDER BY p.due_date ASC
+      LIMIT 10
+    `).all(userId, now.getTime(), futureDate.getTime()) as any[];
+    
+    return rows.map((row) => ({
+      id: row.id,
+      amount: row.amount,
+      dueDate: new Date(row.due_date),
+      status: row.status,
+      product: row.product,
+      customerName: row.customer_name,
+      customerId: row.customer_id,
+    }));
+  }
+
+  async getOverduePaymentsCount(userId: string): Promise<number> {
+    const now = new Date();
+    
+    const result = this.db.prepare(`
+      SELECT COUNT(*) as count
+      FROM payments p
+      INNER JOIN purchases pur ON p.purchase_id = pur.id
+      INNER JOIN customers c ON pur.customer_id = c.id
+      WHERE c.user_id = ?
+        AND p.status != 'paid'
+        AND p.due_date < ?
+    `).get(userId, now.getTime()) as any;
+    
+    return result?.count || 0;
   }
 }
 

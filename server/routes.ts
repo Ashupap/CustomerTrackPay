@@ -4,6 +4,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertCustomerSchema, insertPurchaseSchema } from "@shared/schema";
 import { addMonths, addYears, startOfMonth, startOfYear } from "date-fns";
+import Papa from "papaparse";
 
 function requireAuth(req: any, res: any, next: any) {
   if (!req.isAuthenticated()) {
@@ -143,6 +144,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Customer not found" });
       }
       res.sendStatus(204);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/customers/bulk-import", requireAuth, async (req, res) => {
+    try {
+      const { csvData } = req.body;
+      
+      if (!csvData || typeof csvData !== 'string') {
+        return res.status(400).json({ message: "CSV data is required" });
+      }
+
+      // Auto-detect delimiter for maximum compatibility
+      const parseResult = Papa.parse<Record<string, string>>(csvData, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.trim().toLowerCase(),
+        delimiter: "", // Auto-detect comma, semicolon, tab, etc.
+        quoteChar: '"',
+        escapeChar: '"',
+      });
+
+      // Continue processing even with non-critical errors
+      // Only log errors but don't fail immediately
+
+      const results = {
+        success: [] as any[],
+        failed: [] as any[],
+      };
+
+      for (let i = 0; i < parseResult.data.length; i++) {
+        const row = parseResult.data[i];
+        const rowNumber = i + 2; // +2 because header is row 1 and arrays are 0-indexed
+        
+        try {
+          // Map CSV columns to customer schema
+          const customerData = {
+            name: row.name || row.customer_name || '',
+            email: row.email || null,
+            phone: row.phone || null,
+            company: row.company || null,
+          };
+
+          // Validate using schema
+          const validated = insertCustomerSchema.parse(customerData);
+          
+          // Create customer
+          const customer = await storage.createCustomer(validated, req.user!.id);
+          
+          results.success.push({
+            row: rowNumber,
+            customer,
+          });
+        } catch (error: any) {
+          results.failed.push({
+            row: rowNumber,
+            data: row,
+            error: error.message || 'Unknown error',
+          });
+        }
+      }
+
+      res.status(200).json({
+        total: parseResult.data.length,
+        successCount: results.success.length,
+        failedCount: results.failed.length,
+        results,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

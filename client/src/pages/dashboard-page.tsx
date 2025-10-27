@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { CustomerSummary } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -21,10 +29,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DollarSign, AlertCircle, Plus, Search, Eye, LogOut } from "lucide-react";
+import { DollarSign, AlertCircle, Plus, Search, Eye, LogOut, Upload, CheckCircle, XCircle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
@@ -32,6 +42,10 @@ export default function DashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPeriod, setFilterPeriod] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importResults, setImportResults] = useState<any>(null);
+  const { toast } = useToast();
 
   const { data: customers, isLoading } = useQuery<CustomerSummary[]>({
     queryKey: ["/api/customers"],
@@ -61,6 +75,53 @@ export default function DashboardPage() {
 
   const handleLogout = () => {
     logoutMutation.mutate();
+  };
+
+  const importMutation = useMutation({
+    mutationFn: async (csvData: string) => {
+      const response = await apiRequest("POST", "/api/customers/bulk-import", { csvData });
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      setImportResults(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      toast({
+        title: "Import Completed",
+        description: `${data.successCount} customers imported successfully, ${data.failedCount} failed.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import customers",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCsvFile(file);
+      setImportResults(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!csvFile) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const csvData = e.target?.result as string;
+      importMutation.mutate(csvData);
+    };
+    reader.readAsText(csvFile);
+  };
+
+  const resetImport = () => {
+    setCsvFile(null);
+    setImportResults(null);
+    setImportDialogOpen(false);
   };
 
   return (
@@ -173,6 +234,108 @@ export default function DashboardPage() {
                     <SelectItem value="overdue">With Overdue</SelectItem>
                   </SelectContent>
                 </Select>
+                
+                <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" data-testid="button-import-csv">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import CSV
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-xl">
+                    <DialogHeader>
+                      <DialogTitle>Import Customers from CSV</DialogTitle>
+                      <DialogDescription>
+                        Upload a CSV file with customer data. Required columns: name. Optional: email, phone, company.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      {!importResults ? (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">CSV File</label>
+                            <Input
+                              type="file"
+                              accept=".csv"
+                              onChange={handleFileChange}
+                              data-testid="input-csv-file"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              CSV format: name, email, phone, company (with headers)
+                            </p>
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={resetImport}
+                              data-testid="button-cancel-import"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleImport}
+                              disabled={!csvFile || importMutation.isPending}
+                              data-testid="button-submit-import"
+                            >
+                              {importMutation.isPending ? "Importing..." : "Import"}
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-3 gap-4">
+                            <Card>
+                              <CardContent className="pt-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold">{importResults.total}</div>
+                                  <div className="text-xs text-muted-foreground">Total Rows</div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            <Card className="border-green-200 bg-green-50">
+                              <CardContent className="pt-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-green-700">{importResults.successCount}</div>
+                                  <div className="text-xs text-green-600">Successful</div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            <Card className="border-red-200 bg-red-50">
+                              <CardContent className="pt-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-red-700">{importResults.failedCount}</div>
+                                  <div className="text-xs text-red-600">Failed</div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          {importResults.results.failed.length > 0 && (
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                              <div className="text-sm font-medium">Failed Imports:</div>
+                              {importResults.results.failed.map((failure: any, idx: number) => (
+                                <div key={idx} className="flex items-start gap-2 text-xs p-2 bg-red-50 rounded border border-red-200">
+                                  <XCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <div className="font-medium">Row {failure.row}</div>
+                                    <div className="text-muted-foreground">{failure.error}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex justify-end">
+                            <Button onClick={resetImport} data-testid="button-close-results">
+                              Close
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
                 <Button onClick={() => setLocation("/customers/new")} data-testid="button-add-customer">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Customer

@@ -35,6 +35,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
@@ -143,10 +144,11 @@ export default function DashboardPage() {
               </div>
               <h1 className="text-xl font-medium" data-testid="text-app-name">PayTrack</h1>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground" data-testid="text-username">
                 {user?.username}
               </span>
+              <ThemeToggle />
               <Button
                 variant="outline"
                 size="sm"

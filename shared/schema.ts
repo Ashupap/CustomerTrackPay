@@ -1,10 +1,10 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, integer } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { sql } from "drizzle-orm";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
 });
@@ -17,14 +17,14 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-export const customers = pgTable("customers", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
+export const customers = sqliteTable("customers", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
   company: text("company"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({
@@ -36,15 +36,15 @@ export const insertCustomerSchema = createInsertSchema(customers).omit({
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 export type Customer = typeof customers.$inferSelect;
 
-export const purchases = pgTable("purchases", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  customerId: varchar("customer_id").notNull(),
+export const purchases = sqliteTable("purchases", {
+  id: text("id").primaryKey(),
+  customerId: text("customer_id").notNull(),
   product: text("product").notNull(),
-  purchaseDate: timestamp("purchase_date").notNull(),
-  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  purchaseDate: integer("purchase_date", { mode: "timestamp" }).notNull(),
+  totalPrice: text("total_price").notNull(),
   paymentTerms: text("payment_terms").notNull(), // 'monthly', 'quarterly', 'yearly', 'one-time'
-  initialPayment: decimal("initial_payment", { precision: 10, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  initialPayment: text("initial_payment").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
 export const insertPurchaseSchema = createInsertSchema(purchases, {
@@ -59,14 +59,14 @@ export const insertPurchaseSchema = createInsertSchema(purchases, {
 export type InsertPurchase = z.infer<typeof insertPurchaseSchema>;
 export type Purchase = typeof purchases.$inferSelect;
 
-export const payments = pgTable("payments", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  purchaseId: varchar("purchase_id").notNull(),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  dueDate: timestamp("due_date").notNull(),
+export const payments = sqliteTable("payments", {
+  id: text("id").primaryKey(),
+  purchaseId: text("purchase_id").notNull(),
+  amount: text("amount").notNull(),
+  dueDate: integer("due_date", { mode: "timestamp" }).notNull(),
   status: text("status").notNull(), // 'paid', 'upcoming', 'overdue'
-  paidDate: timestamp("paid_date"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  paidDate: integer("paid_date", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
 export const insertPaymentSchema = createInsertSchema(payments, {

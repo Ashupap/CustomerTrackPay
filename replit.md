@@ -4,11 +4,17 @@
 PayTrack is a comprehensive customer payment tracking web application designed to help businesses manage customer purchases, monitor payment schedules, and track receivables. Built with a Material Design approach, the application provides an intuitive dashboard-first interface for managing payment collections.
 
 ## Current State (October 27, 2025)
-- **Version**: MVP 1.0
-- **Status**: Fully functional and tested
+- **Version**: MVP 1.1
+- **Status**: Fully functional with SQLite persistence
 - **Last Updated**: October 27, 2025
 
 ## Recent Changes
+- **October 27, 2025**: SQLite Database Migration
+  - Migrated from in-memory storage to SQLite for data persistence
+  - Database file: ./paytrack.db
+  - Foreign key constraints with CASCADE DELETE
+  - Session persistence using better-sqlite3-session-store
+  - All data now survives server restarts
 - **October 27, 2025**: Initial MVP implementation completed
   - Custom authentication system with username/password
   - Dashboard with KPI cards (Total Payments Received, Total Overdue Amounts)
@@ -21,7 +27,7 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 - **Design System**: Material Design with Roboto font family
 - **Color Scheme**: Professional blue primary (#3B82F6), subtle backgrounds, clear hierarchy
 - **Layout**: Dashboard-first approach, information-dense tables, card-based components
-- **Data Storage**: In-memory storage (MemStorage) for MVP - can be migrated to PostgreSQL for persistence
+- **Data Storage**: SQLite database with persistent storage
 
 ## Project Architecture
 
@@ -37,8 +43,9 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 
 **Backend**:
 - Node.js with Express
+- SQLite with better-sqlite3
 - Passport.js with Local Strategy for authentication
-- Express-session with in-memory store
+- Express-session with better-sqlite3-session-store
 - Scrypt for password hashing
 - TypeScript for type safety
 
@@ -180,13 +187,17 @@ PayTrack is a comprehensive customer payment tracking web application designed t
   - Data persistence across sessions
   - KPI calculations and filtering
 
+## Database Maintenance
+- **Database File**: ./paytrack.db (SQLite database file)
+- **Backup**: Regularly copy paytrack.db file to backup location
+- **Foreign Keys**: Enabled with CASCADE DELETE - deleting a customer removes all associated purchases and payments
+- **WAL Mode**: Write-Ahead Logging enabled for better concurrency and performance
+
 ## Known Items
 1. **KPI "This Month" filter edge case**: Payments marked as paid on the current day may show $0 due to date range filtering logic
 2. **Payment schedule configuration**: Installment counts are currently hardcoded (6 for monthly, 4 for quarterly, 3 for yearly) - could be made configurable
-3. **Data persistence**: Currently using in-memory storage - data is lost on server restart. Migrate to PostgreSQL for production use.
 
 ## Next Phase Ideas
-- Migrate to PostgreSQL for data persistence
 - Add bulk customer import via CSV
 - Implement payment reminders and notifications
 - Create detailed analytics and reporting with charts

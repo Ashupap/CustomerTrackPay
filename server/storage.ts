@@ -12,9 +12,11 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import Database from "better-sqlite3";
+// @ts-ignore - no type definitions available
+import SqliteStore from "better-sqlite3-session-store";
 
-const MemoryStore = createMemoryStore(session);
+const SessionStore = SqliteStore(session);
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -37,62 +39,125 @@ export interface IStorage {
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: string, payment: Partial<InsertPayment>): Promise<Payment | undefined>;
   
-  sessionStore: session.SessionStore;
+  sessionStore: any;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private customers: Map<string, Customer>;
-  private purchases: Map<string, Purchase>;
-  private payments: Map<string, Payment>;
-  sessionStore: session.SessionStore;
+export class SqliteStorage implements IStorage {
+  private db: Database.Database;
+  sessionStore: any;
 
-  constructor() {
-    this.users = new Map();
-    this.customers = new Map();
-    this.purchases = new Map();
-    this.payments = new Map();
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
+  constructor(dbPath: string = "./paytrack.db") {
+    this.db = new Database(dbPath);
+    this.db.pragma("journal_mode = WAL");
+    this.db.pragma("foreign_keys = ON");
+    
+    this.initializeDatabase();
+    
+    this.sessionStore = new SessionStore({
+      client: this.db,
+      expired: {
+        clear: true,
+        intervalMs: 900000
+      }
     });
   }
 
+  private initializeDatabase() {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS customers (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        company TEXT,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS purchases (
+        id TEXT PRIMARY KEY,
+        customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+        product TEXT NOT NULL,
+        purchase_date INTEGER NOT NULL,
+        total_price TEXT NOT NULL,
+        payment_terms TEXT NOT NULL,
+        initial_payment TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS payments (
+        id TEXT PRIMARY KEY,
+        purchase_id TEXT NOT NULL REFERENCES purchases(id) ON DELETE CASCADE,
+        amount TEXT NOT NULL,
+        due_date INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        paid_date INTEGER,
+        created_at INTEGER NOT NULL
+      );
+    `);
+  }
+
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const row = this.db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+    return row as User | undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const row = this.db.prepare("SELECT * FROM users WHERE username = ?").get(username);
+    return row as User | undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
     const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    
+    try {
+      this.db.prepare("INSERT INTO users (id, username, password) VALUES (?, ?, ?)")
+        .run(user.id, user.username, user.password);
+    } catch (error: any) {
+      if (error.message?.includes('UNIQUE constraint failed')) {
+        throw new Error('Username already exists');
+      }
+      throw error;
+    }
+    
     return user;
   }
 
   async getCustomer(id: string, userId: string): Promise<Customer | undefined> {
-    const customer = this.customers.get(id);
-    if (customer && customer.userId === userId) {
-      return customer;
-    }
-    return undefined;
+    const row = this.db.prepare("SELECT * FROM customers WHERE id = ? AND user_id = ?")
+      .get(id, userId) as any;
+    
+    if (!row) return undefined;
+    
+    return {
+      ...row,
+      userId: row.user_id,
+      createdAt: new Date(row.created_at),
+    };
   }
 
   async getCustomers(userId: string): Promise<CustomerSummary[]> {
-    const userCustomers = Array.from(this.customers.values()).filter(
-      (c) => c.userId === userId
-    );
+    const rows = this.db.prepare("SELECT * FROM customers WHERE user_id = ? ORDER BY created_at DESC")
+      .all(userId) as any[];
 
     const summaries: CustomerSummary[] = [];
 
-    for (const customer of userCustomers) {
-      const purchases = Array.from(this.purchases.values()).filter(
-        (p) => p.customerId === customer.id
-      );
+    for (const row of rows) {
+      const customer: Customer = {
+        ...row,
+        userId: row.user_id,
+        createdAt: new Date(row.created_at),
+      };
+
+      const purchases = this.db.prepare("SELECT * FROM purchases WHERE customer_id = ?")
+        .all(customer.id) as any[];
 
       let nextPaymentDate: string | null = null;
       let nextPaymentAmount: string | null = null;
@@ -100,21 +165,20 @@ export class MemStorage implements IStorage {
       let totalPaid = 0;
 
       for (const purchase of purchases) {
-        const payments = Array.from(this.payments.values())
-          .filter((p) => p.purchaseId === purchase.id)
-          .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        const payments = this.db.prepare("SELECT * FROM payments WHERE purchase_id = ? ORDER BY due_date ASC")
+          .all(purchase.id) as any[];
 
         for (const payment of payments) {
           if (payment.status === "paid") {
             totalPaid += parseFloat(payment.amount);
           } else {
-            const dueDate = new Date(payment.dueDate);
+            const dueDate = new Date(payment.due_date);
             const now = new Date();
             
             if (dueDate < now) {
               totalOverdue += parseFloat(payment.amount);
             } else if (!nextPaymentDate || dueDate < new Date(nextPaymentDate)) {
-              nextPaymentDate = payment.dueDate.toISOString();
+              nextPaymentDate = new Date(payment.due_date).toISOString();
               nextPaymentAmount = payment.amount;
             }
           }
@@ -130,23 +194,37 @@ export class MemStorage implements IStorage {
       });
     }
 
-    return summaries.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    return summaries;
   }
 
   async getCustomerWithPurchases(id: string, userId: string): Promise<CustomerWithPurchases | undefined> {
     const customer = await this.getCustomer(id, userId);
     if (!customer) return undefined;
 
-    const purchases = Array.from(this.purchases.values())
-      .filter((p) => p.customerId === customer.id)
-      .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+    const purchaseRows = this.db.prepare("SELECT * FROM purchases WHERE customer_id = ? ORDER BY purchase_date DESC")
+      .all(customer.id) as any[];
 
-    const purchasesWithPayments = purchases.map((purchase) => {
-      const payments = Array.from(this.payments.values())
-        .filter((p) => p.purchaseId === purchase.id)
-        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    const purchasesWithPayments = purchaseRows.map((row) => {
+      const purchase: Purchase = {
+        ...row,
+        customerId: row.customer_id,
+        purchaseDate: new Date(row.purchase_date),
+        totalPrice: row.total_price,
+        paymentTerms: row.payment_terms,
+        initialPayment: row.initial_payment,
+        createdAt: new Date(row.created_at),
+      };
+
+      const paymentRows = this.db.prepare("SELECT * FROM payments WHERE purchase_id = ? ORDER BY due_date ASC")
+        .all(purchase.id) as any[];
+
+      const payments: Payment[] = paymentRows.map((p) => ({
+        ...p,
+        purchaseId: p.purchase_id,
+        dueDate: new Date(p.due_date),
+        paidDate: p.paid_date ? new Date(p.paid_date) : null,
+        createdAt: new Date(p.created_at),
+      }));
 
       return {
         ...purchase,
@@ -162,13 +240,30 @@ export class MemStorage implements IStorage {
 
   async createCustomer(insertCustomer: InsertCustomer, userId: string): Promise<Customer> {
     const id = randomUUID();
+    const createdAt = new Date();
+    
     const customer: Customer = {
-      ...insertCustomer,
       id,
       userId,
-      createdAt: new Date(),
+      name: insertCustomer.name,
+      email: insertCustomer.email ?? null,
+      phone: insertCustomer.phone ?? null,
+      company: insertCustomer.company ?? null,
+      createdAt,
     };
-    this.customers.set(id, customer);
+
+    this.db.prepare(
+      "INSERT INTO customers (id, user_id, name, email, phone, company, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      customer.id,
+      customer.userId,
+      customer.name,
+      customer.email,
+      customer.phone,
+      customer.company,
+      createdAt.getTime()
+    );
+
     return customer;
   }
 
@@ -180,72 +275,151 @@ export class MemStorage implements IStorage {
       ...existing,
       ...insertCustomer,
     };
-    this.customers.set(id, updated);
+
+    this.db.prepare(
+      "UPDATE customers SET name = ?, email = ?, phone = ?, company = ? WHERE id = ? AND user_id = ?"
+    ).run(
+      updated.name,
+      updated.email,
+      updated.phone,
+      updated.company,
+      id,
+      userId
+    );
+
     return updated;
   }
 
   async deleteCustomer(id: string, userId: string): Promise<boolean> {
     const customer = await this.getCustomer(id, userId);
     if (!customer) return false;
-    this.customers.delete(id);
+    
+    this.db.prepare("DELETE FROM customers WHERE id = ? AND user_id = ?").run(id, userId);
     return true;
   }
 
   async getPurchase(id: string): Promise<Purchase | undefined> {
-    return this.purchases.get(id);
+    const row = this.db.prepare("SELECT * FROM purchases WHERE id = ?").get(id) as any;
+    if (!row) return undefined;
+
+    return {
+      ...row,
+      customerId: row.customer_id,
+      purchaseDate: new Date(row.purchase_date),
+      totalPrice: row.total_price,
+      paymentTerms: row.payment_terms,
+      initialPayment: row.initial_payment,
+      createdAt: new Date(row.created_at),
+    };
   }
 
   async getPurchasesByCustomer(customerId: string): Promise<Purchase[]> {
-    return Array.from(this.purchases.values()).filter(
-      (p) => p.customerId === customerId
-    );
+    const rows = this.db.prepare("SELECT * FROM purchases WHERE customer_id = ?").all(customerId) as any[];
+    
+    return rows.map((row) => ({
+      ...row,
+      customerId: row.customer_id,
+      purchaseDate: new Date(row.purchase_date),
+      totalPrice: row.total_price,
+      paymentTerms: row.payment_terms,
+      initialPayment: row.initial_payment,
+      createdAt: new Date(row.created_at),
+    }));
   }
 
   async createPurchase(insertPurchase: InsertPurchase): Promise<Purchase> {
     const id = randomUUID();
+    const purchaseDate = typeof insertPurchase.purchaseDate === 'string' 
+      ? new Date(insertPurchase.purchaseDate)
+      : insertPurchase.purchaseDate;
+    const createdAt = new Date();
+
     const purchase: Purchase = {
       ...insertPurchase,
       id,
-      purchaseDate: typeof insertPurchase.purchaseDate === 'string' 
-        ? new Date(insertPurchase.purchaseDate)
-        : insertPurchase.purchaseDate,
-      createdAt: new Date(),
+      purchaseDate,
+      createdAt,
     };
-    this.purchases.set(id, purchase);
+
+    this.db.prepare(
+      "INSERT INTO purchases (id, customer_id, product, purchase_date, total_price, payment_terms, initial_payment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      purchase.id,
+      purchase.customerId,
+      purchase.product,
+      purchaseDate.getTime(),
+      purchase.totalPrice,
+      purchase.paymentTerms,
+      purchase.initialPayment,
+      createdAt.getTime()
+    );
+
     return purchase;
   }
 
   async getPayment(id: string): Promise<Payment | undefined> {
-    return this.payments.get(id);
+    const row = this.db.prepare("SELECT * FROM payments WHERE id = ?").get(id) as any;
+    if (!row) return undefined;
+
+    return {
+      ...row,
+      purchaseId: row.purchase_id,
+      dueDate: new Date(row.due_date),
+      paidDate: row.paid_date ? new Date(row.paid_date) : null,
+      createdAt: new Date(row.created_at),
+    };
   }
 
   async getPaymentsByPurchase(purchaseId: string): Promise<Payment[]> {
-    return Array.from(this.payments.values())
-      .filter((p) => p.purchaseId === purchaseId)
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    const rows = this.db.prepare("SELECT * FROM payments WHERE purchase_id = ? ORDER BY due_date ASC")
+      .all(purchaseId) as any[];
+    
+    return rows.map((row) => ({
+      ...row,
+      purchaseId: row.purchase_id,
+      dueDate: new Date(row.due_date),
+      paidDate: row.paid_date ? new Date(row.paid_date) : null,
+      createdAt: new Date(row.created_at),
+    }));
   }
 
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
     const id = randomUUID();
+    const dueDate = typeof insertPayment.dueDate === 'string'
+      ? new Date(insertPayment.dueDate)
+      : insertPayment.dueDate;
+    const paidDate = insertPayment.paidDate 
+      ? (typeof insertPayment.paidDate === 'string'
+        ? new Date(insertPayment.paidDate)
+        : insertPayment.paidDate)
+      : null;
+    const createdAt = new Date();
+
     const payment: Payment = {
       ...insertPayment,
       id,
-      dueDate: typeof insertPayment.dueDate === 'string'
-        ? new Date(insertPayment.dueDate)
-        : insertPayment.dueDate,
-      paidDate: insertPayment.paidDate 
-        ? (typeof insertPayment.paidDate === 'string'
-          ? new Date(insertPayment.paidDate)
-          : insertPayment.paidDate)
-        : null,
-      createdAt: new Date(),
+      dueDate,
+      paidDate,
+      createdAt,
     };
-    this.payments.set(id, payment);
+
+    this.db.prepare(
+      "INSERT INTO payments (id, purchase_id, amount, due_date, status, paid_date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      payment.id,
+      payment.purchaseId,
+      payment.amount,
+      dueDate.getTime(),
+      payment.status,
+      paidDate ? paidDate.getTime() : null,
+      createdAt.getTime()
+    );
+
     return payment;
   }
 
   async updatePayment(id: string, updates: Partial<InsertPayment>): Promise<Payment | undefined> {
-    const existing = this.payments.get(id);
+    const existing = await this.getPayment(id);
     if (!existing) return undefined;
 
     const updated: Payment = {
@@ -260,9 +434,19 @@ export class MemStorage implements IStorage {
           : null)
         : existing.paidDate,
     };
-    this.payments.set(id, updated);
+
+    this.db.prepare(
+      "UPDATE payments SET amount = ?, due_date = ?, status = ?, paid_date = ? WHERE id = ?"
+    ).run(
+      updated.amount,
+      updated.dueDate.getTime(),
+      updated.status,
+      updated.paidDate ? updated.paidDate.getTime() : null,
+      id
+    );
+
     return updated;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new SqliteStorage();

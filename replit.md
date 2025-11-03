@@ -9,6 +9,21 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 - **Last Updated**: November 3, 2025
 
 ## Recent Changes
+- **November 3, 2025**: Comprehensive Edit Functionality for Admins
+  - Added full edit capabilities for customers, purchases, and payments
+  - Customer edit: Reuses customer form with pre-filled data (name, email, phone, company)
+  - Purchase edit: Route /customers/:customerId/purchase/:purchaseId/edit with pre-filled form
+  - Payment edit: Dialog-based editing for unpaid payments (amount and due date only)
+  - Edit buttons added throughout UI:
+    - Dashboard: Edit button for each customer row
+    - Customer detail: Edit button in header and on each purchase card
+    - Payment timeline: Edit button for unpaid payments only
+  - Security hardening:
+    - Payment edits restricted to amount and dueDate fields only (prevents status/paidDate manipulation)
+    - Purchase edits prevent customerId changes (prevents cross-tenant data breaches)
+  - Backend routes: PATCH /api/customers/:id, PATCH /api/purchases/:id, PATCH /api/payments/:id
+  - All edits properly invalidate TanStack Query cache for UI updates
+  - End-to-end testing confirmed all edit operations work securely
 - **November 3, 2025**: Rental Payment System Migration
   - Migrated from installment-based to rental-based payment model
   - Purchases now track: initialPayment (upfront), rentalAmount (recurring), rentalFrequency (schedule)

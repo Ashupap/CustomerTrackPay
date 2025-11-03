@@ -38,7 +38,9 @@ export interface IStorage {
   getPayment(id: string): Promise<Payment | undefined>;
   getPaymentsByPurchase(purchaseId: string): Promise<Payment[]>;
   getUpcomingPayments(userId: string, daysAhead: number): Promise<any[]>;
+  getThisMonthUpcomingPayments(userId: string): Promise<any[]>;
   getOverduePaymentsCount(userId: string): Promise<number>;
+  getOverduePayments(userId: string): Promise<any[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: string, payment: Partial<InsertPayment>): Promise<Payment | undefined>;
   
@@ -543,6 +545,85 @@ export class SqliteStorage implements IStorage {
     `).get(userId, now.getTime()) as any;
     
     return result?.count || 0;
+  }
+
+  async getThisMonthUpcomingPayments(userId: string): Promise<any[]> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    const rows = this.db.prepare(`
+      SELECT 
+        p.id,
+        p.amount,
+        p.due_date,
+        p.status,
+        pur.product,
+        c.name as customer_name,
+        c.company,
+        c.email,
+        c.phone,
+        c.id as customer_id
+      FROM payments p
+      INNER JOIN purchases pur ON p.purchase_id = pur.id
+      INNER JOIN customers c ON pur.customer_id = c.id
+      WHERE c.user_id = ?
+        AND p.status != 'paid'
+        AND p.due_date >= ?
+        AND p.due_date <= ?
+      ORDER BY p.due_date ASC
+    `).all(userId, now.getTime(), endOfMonth.getTime()) as any[];
+    
+    return rows.map((row) => ({
+      id: row.id,
+      amount: row.amount,
+      dueDate: new Date(row.due_date),
+      status: row.status,
+      product: row.product,
+      customerName: row.customer_name,
+      company: row.company,
+      email: row.email,
+      phone: row.phone,
+      customerId: row.customer_id,
+    }));
+  }
+
+  async getOverduePayments(userId: string): Promise<any[]> {
+    const now = new Date();
+    
+    const rows = this.db.prepare(`
+      SELECT 
+        p.id,
+        p.amount,
+        p.due_date,
+        p.status,
+        pur.product,
+        c.name as customer_name,
+        c.company,
+        c.email,
+        c.phone,
+        c.id as customer_id
+      FROM payments p
+      INNER JOIN purchases pur ON p.purchase_id = pur.id
+      INNER JOIN customers c ON pur.customer_id = c.id
+      WHERE c.user_id = ?
+        AND p.status != 'paid'
+        AND p.due_date < ?
+      ORDER BY p.due_date ASC
+    `).all(userId, now.getTime()) as any[];
+    
+    return rows.map((row) => ({
+      id: row.id,
+      amount: row.amount,
+      dueDate: new Date(row.due_date),
+      status: row.status,
+      product: row.product,
+      customerName: row.customer_name,
+      company: row.company,
+      email: row.email,
+      phone: row.phone,
+      customerId: row.customer_id,
+    }));
   }
 }
 

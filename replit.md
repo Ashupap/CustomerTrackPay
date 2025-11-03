@@ -1,14 +1,23 @@
 # PayTrack - Customer Payment Tracking System
 
 ## Overview
-PayTrack is a comprehensive customer payment tracking web application designed to help businesses manage customer purchases, monitor payment schedules, and track receivables. Built with a Material Design approach, the application provides an intuitive dashboard-first interface for managing payment collections.
+PayTrack is a comprehensive customer payment tracking web application designed to help businesses manage customer rentals and recurring payments. Built with a Material Design approach, the application provides an intuitive dashboard-first interface for managing rental payment collections. The system tracks initial payments and recurring rental payments on flexible schedules (monthly/quarterly/yearly/one-time).
 
-## Current State (October 27, 2025)
-- **Version**: MVP 1.1
+## Current State (November 3, 2025)
+- **Version**: MVP 1.2 (Rental Payment System)
 - **Status**: Fully functional with SQLite persistence
-- **Last Updated**: October 27, 2025
+- **Last Updated**: November 3, 2025
 
 ## Recent Changes
+- **November 3, 2025**: Rental Payment System Migration
+  - Migrated from installment-based to rental-based payment model
+  - Purchases now track: initialPayment (upfront), rentalAmount (recurring), rentalFrequency (schedule)
+  - Payment generation: 1 initial payment (marked paid) + 12 months of recurring rental payments
+  - Updated purchase form UI to collect rental information
+  - Fixed dashboard KPI query to use proper URL format (/api/kpi?period=...)
+  - Fixed query invalidation to use predicate matching for all KPI queries
+  - Database dropped and recreated with new schema (all test data reset)
+  - End-to-end testing confirmed system works correctly with new rental model
 - **October 27, 2025**: Dark Mode & Login Screen Redesign
   - Implemented full dark mode support with ThemeProvider and localStorage persistence
   - Added theme toggle button (Moon/Sun icons) to both login page and dashboard
@@ -84,10 +93,15 @@ PayTrack is a comprehensive customer payment tracking web application designed t
    - id, userId, name, email, phone, company, createdAt
    - Belongs to a user, has many purchases
 
-3. **Purchases**: Transaction records
-   - id, customerId, product, purchaseDate, totalPrice, paymentTerms, initialPayment, createdAt
-   - Payment terms: one-time, monthly (6 installments), quarterly (4 installments), yearly (3 installments)
-   - Automatically generates payment schedule on creation
+3. **Purchases**: Rental transaction records
+   - id, customerId, product, purchaseDate, initialPayment, rentalAmount, rentalFrequency, createdAt
+   - Rental frequencies: monthly, quarterly, yearly, one-time
+   - Automatically generates payment schedule on creation:
+     - 1 initial payment (marked as paid)
+     - Monthly: 12 recurring payments
+     - Quarterly: 4 recurring payments
+     - Yearly: 3 recurring payments
+     - One-time: 1 rental payment
 
 4. **Payments**: Individual payment records
    - id, purchaseId, amount, dueDate, status (paid/upcoming/overdue), paidDate, createdAt
@@ -131,18 +145,19 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 - Track payment timelines visually
 
 #### Purchase & Payment Tracking
-- Create purchases with flexible payment terms
-- Automatic payment schedule generation based on terms
+- Create rental purchases with initial payment + recurring rental amounts
+- Flexible rental frequency (monthly/quarterly/yearly/one-time)
+- Automatic payment schedule generation based on rental frequency
 - Visual payment timeline with status indicators
 - One-click payment status updates
-- Initial payment support (down payment)
+- Initial payment automatically marked as paid
 
-#### Payment Schedule Calculation
-- **One-time**: Single payment equal to total price
-- **Monthly**: 6 equal monthly installments
-- **Quarterly**: 4 equal quarterly installments
-- **Yearly**: 3 equal yearly installments
-- Initial payment counted separately and marked as paid
+#### Payment Schedule Calculation (Rental Model)
+- **Initial Payment**: Always marked as paid on purchase date
+- **Monthly Rentals**: 12 recurring payments (one per month)
+- **Quarterly Rentals**: 4 recurring payments (one per quarter)
+- **Yearly Rentals**: 3 recurring payments (one per year)
+- **One-time Rentals**: 1 rental payment on purchase date
 - Automatic overdue detection based on due dates
 
 ### File Structure
@@ -229,7 +244,8 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 
 ## Known Items
 1. **KPI "This Month" filter edge case**: Payments marked as paid on the current day may show $0 due to date range filtering logic
-2. **Payment schedule configuration**: Installment counts are currently hardcoded (6 for monthly, 4 for quarterly, 3 for yearly) - could be made configurable
+2. **Rental schedule configuration**: Payment counts are currently hardcoded (12 monthly, 4 quarterly, 3 yearly) - could be made configurable
+3. **Query invalidation**: Uses predicate matching for KPI queries to ensure proper cache invalidation across different period filters
 
 ## Next Phase Ideas
 - Add bulk customer import via CSV

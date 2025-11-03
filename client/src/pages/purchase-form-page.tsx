@@ -38,9 +38,9 @@ export default function PurchaseFormPage() {
       customerId: customerId || "",
       product: "",
       purchaseDate: new Date(),
-      totalPrice: "",
-      paymentTerms: "monthly",
       initialPayment: "",
+      rentalAmount: "",
+      rentalFrequency: "monthly",
     },
   });
 
@@ -52,7 +52,12 @@ export default function PurchaseFormPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customers", customerId] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/kpi"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0] as string;
+          return key?.startsWith("/api/kpi");
+        }
+      });
       toast({
         title: "Purchase added",
         description: "Purchase and payment schedule have been created successfully",
@@ -87,7 +92,7 @@ export default function PurchaseFormPage() {
             <CardHeader>
               <CardTitle className="text-2xl">Add New Purchase</CardTitle>
               <CardDescription>
-                Enter purchase details and payment terms to generate a payment schedule
+                Enter initial payment and recurring rental details
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -134,52 +139,6 @@ export default function PurchaseFormPage() {
 
                   <FormField
                     control={form.control}
-                    name="totalPrice"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Price *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="5000.00"
-                            {...field}
-                            data-testid="input-total-price"
-                          />
-                        </FormControl>
-                        <FormDescription>Total amount to be paid</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="paymentTerms"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Payment Terms *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-payment-terms">
-                              <SelectValue placeholder="Select payment frequency" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="one-time">One-time Payment</SelectItem>
-                            <SelectItem value="monthly">Monthly</SelectItem>
-                            <SelectItem value="quarterly">Quarterly</SelectItem>
-                            <SelectItem value="yearly">Yearly</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>How often payments should be made</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="initialPayment"
                     render={({ field }) => (
                       <FormItem>
@@ -193,7 +152,53 @@ export default function PurchaseFormPage() {
                             data-testid="input-initial-payment"
                           />
                         </FormControl>
-                        <FormDescription>First payment amount (can be zero)</FormDescription>
+                        <FormDescription>Upfront one-time payment (can be zero)</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="rentalAmount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rental Amount *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="500.00"
+                            {...field}
+                            data-testid="input-rental-amount"
+                          />
+                        </FormControl>
+                        <FormDescription>Recurring rental payment amount</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="rentalFrequency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rental Frequency *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-rental-frequency">
+                              <SelectValue placeholder="Select rental frequency" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="one-time">One-time</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                            <SelectItem value="quarterly">Quarterly</SelectItem>
+                            <SelectItem value="yearly">Yearly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>How often rental payments are due</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

@@ -41,16 +41,16 @@ export const purchases = sqliteTable("purchases", {
   customerId: text("customer_id").notNull(),
   product: text("product").notNull(),
   purchaseDate: integer("purchase_date", { mode: "timestamp" }).notNull(),
-  totalPrice: text("total_price").notNull(),
-  paymentTerms: text("payment_terms").notNull(), // 'monthly', 'quarterly', 'yearly', 'one-time'
   initialPayment: text("initial_payment").notNull(),
+  rentalAmount: text("rental_amount").notNull(),
+  rentalFrequency: text("rental_frequency").notNull(), // 'monthly', 'quarterly', 'yearly', 'one-time'
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
 export const insertPurchaseSchema = createInsertSchema(purchases, {
   purchaseDate: z.coerce.date(),
-  totalPrice: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
   initialPayment: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
+  rentalAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
 }).omit({
   id: true,
   createdAt: true,

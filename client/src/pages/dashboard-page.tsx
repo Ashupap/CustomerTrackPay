@@ -56,7 +56,7 @@ export default function DashboardPage() {
     totalPaid: number;
     totalOverdue: number;
   }>({
-    queryKey: ["/api/kpi", filterPeriod],
+    queryKey: [`/api/kpi?period=${filterPeriod}`],
   });
 
   const { data: upcomingPayments } = useQuery<any[]>({

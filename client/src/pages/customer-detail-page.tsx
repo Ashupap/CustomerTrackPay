@@ -28,7 +28,12 @@ export default function CustomerDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customers", customerId] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/kpi"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0] as string;
+          return key?.startsWith("/api/kpi");
+        }
+      });
       toast({
         title: "Payment marked as paid",
         description: "Payment status has been updated successfully",
@@ -172,11 +177,12 @@ export default function CustomerDetailPage() {
                           </span>
                           <span className="flex items-center gap-1">
                             <DollarSign className="h-3 w-3" />
-                            Total: ${parseFloat(purchase.totalPrice).toLocaleString()}
+                            Initial: ${parseFloat(purchase.initialPayment).toLocaleString()}
                           </span>
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {purchase.paymentTerms}
-                          </Badge>
+                          <span className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            Rental: ${parseFloat(purchase.rentalAmount).toLocaleString()} {purchase.rentalFrequency}
+                          </span>
                         </div>
                       </div>
                     </div>

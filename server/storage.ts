@@ -87,9 +87,9 @@ export class SqliteStorage implements IStorage {
         customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
         product TEXT NOT NULL,
         purchase_date INTEGER NOT NULL,
-        total_price TEXT NOT NULL,
-        payment_terms TEXT NOT NULL,
         initial_payment TEXT NOT NULL,
+        rental_amount TEXT NOT NULL,
+        rental_frequency TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
 
@@ -211,9 +211,9 @@ export class SqliteStorage implements IStorage {
         ...row,
         customerId: row.customer_id,
         purchaseDate: new Date(row.purchase_date),
-        totalPrice: row.total_price,
-        paymentTerms: row.payment_terms,
         initialPayment: row.initial_payment,
+        rentalAmount: row.rental_amount,
+        rentalFrequency: row.rental_frequency,
         createdAt: new Date(row.created_at),
       };
 
@@ -308,9 +308,9 @@ export class SqliteStorage implements IStorage {
       ...row,
       customerId: row.customer_id,
       purchaseDate: new Date(row.purchase_date),
-      totalPrice: row.total_price,
-      paymentTerms: row.payment_terms,
       initialPayment: row.initial_payment,
+      rentalAmount: row.rental_amount,
+      rentalFrequency: row.rental_frequency,
       createdAt: new Date(row.created_at),
     };
   }
@@ -322,9 +322,9 @@ export class SqliteStorage implements IStorage {
       ...row,
       customerId: row.customer_id,
       purchaseDate: new Date(row.purchase_date),
-      totalPrice: row.total_price,
-      paymentTerms: row.payment_terms,
       initialPayment: row.initial_payment,
+      rentalAmount: row.rental_amount,
+      rentalFrequency: row.rental_frequency,
       createdAt: new Date(row.created_at),
     }));
   }
@@ -344,15 +344,15 @@ export class SqliteStorage implements IStorage {
     };
 
     this.db.prepare(
-      "INSERT INTO purchases (id, customer_id, product, purchase_date, total_price, payment_terms, initial_payment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO purchases (id, customer_id, product, purchase_date, initial_payment, rental_amount, rental_frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       purchase.id,
       purchase.customerId,
       purchase.product,
       purchaseDate.getTime(),
-      purchase.totalPrice,
-      purchase.paymentTerms,
       purchase.initialPayment,
+      purchase.rentalAmount,
+      purchase.rentalFrequency,
       createdAt.getTime()
     );
 

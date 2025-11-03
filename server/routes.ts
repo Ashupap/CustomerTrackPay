@@ -14,22 +14,11 @@ function requireAuth(req: any, res: any, next: any) {
 }
 
 function calculatePayments(
-  totalPrice: number,
   initialPayment: number,
-  paymentTerms: string,
+  rentalAmount: number,
+  rentalFrequency: string,
   purchaseDate: Date
 ) {
-  const remaining = totalPrice - initialPayment;
-  
-  if (paymentTerms === "one-time") {
-    return [{
-      amount: totalPrice.toFixed(2),
-      dueDate: purchaseDate,
-      status: initialPayment >= totalPrice ? "paid" : "upcoming",
-      paidDate: initialPayment >= totalPrice ? purchaseDate : null,
-    }];
-  }
-
   const payments: Array<{
     amount: string;
     dueDate: Date;
@@ -37,6 +26,9 @@ function calculatePayments(
     paidDate: Date | null;
   }> = [];
 
+  const now = new Date();
+
+  // Add initial payment (always marked as paid on purchase date)
   if (initialPayment > 0) {
     payments.push({
       amount: initialPayment.toFixed(2),
@@ -46,26 +38,38 @@ function calculatePayments(
     });
   }
 
-  if (remaining <= 0) {
+  // For one-time rental, create only one rental payment
+  if (rentalFrequency === "one-time") {
+    const dueDate = purchaseDate;
+    payments.push({
+      amount: rentalAmount.toFixed(2),
+      dueDate,
+      status: dueDate < now ? "overdue" : "upcoming",
+      paidDate: null,
+    });
     return payments;
   }
 
-  let numInstallments = 6;
-  let addPeriod = (date: Date, num: number) => addMonths(date, num);
+  // For recurring rentals (monthly, quarterly, yearly), create payments for next 12 months
+  let addPeriod: (date: Date, num: number) => Date;
+  let numPayments = 12; // Number of future rental payments to generate
 
-  if (paymentTerms === "quarterly") {
-    numInstallments = 4;
+  if (rentalFrequency === "monthly") {
+    addPeriod = (date: Date, num: number) => addMonths(date, num);
+    numPayments = 12; // 12 monthly payments
+  } else if (rentalFrequency === "quarterly") {
     addPeriod = (date: Date, num: number) => addMonths(date, num * 3);
-  } else if (paymentTerms === "yearly") {
-    numInstallments = 3;
+    numPayments = 4; // 4 quarterly payments (1 year)
+  } else if (rentalFrequency === "yearly") {
     addPeriod = (date: Date, num: number) => addYears(date, num);
+    numPayments = 3; // 3 yearly payments
+  } else {
+    return payments; // Invalid frequency
   }
 
-  const installmentAmount = remaining / numInstallments;
-  const now = new Date();
-
-  for (let i = 0; i < numInstallments; i++) {
-    const dueDate = addPeriod(purchaseDate, i + 1);
+  // Generate recurring rental payments
+  for (let i = 0; i < numPayments; i++) {
+    const dueDate = addPeriod!(purchaseDate, i + 1);
     
     let status = "upcoming";
     if (dueDate < now) {
@@ -73,7 +77,7 @@ function calculatePayments(
     }
     
     payments.push({
-      amount: installmentAmount.toFixed(2),
+      amount: rentalAmount.toFixed(2),
       dueDate,
       status,
       paidDate: null,
@@ -230,9 +234,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const purchase = await storage.createPurchase(validated);
       
       const paymentsToCreate = calculatePayments(
-        parseFloat(validated.totalPrice),
         parseFloat(validated.initialPayment),
-        validated.paymentTerms,
+        parseFloat(validated.rentalAmount),
+        validated.rentalFrequency,
         new Date(validated.purchaseDate)
       );
 

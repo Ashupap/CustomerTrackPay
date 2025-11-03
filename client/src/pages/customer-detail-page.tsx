@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Plus, Check, Mail, Phone, Building2, DollarSign, Package, Calendar, Edit2 } from "lucide-react";
-import { format, isPast, isFuture } from "date-fns";
+import { format, isPast, isFuture, startOfDay } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -135,7 +135,11 @@ export default function CustomerDetailPage() {
 
   const getPaymentStatus = (payment: Payment): "paid" | "overdue" | "upcoming" => {
     if (payment.status === "paid") return "paid";
-    if (isPast(new Date(payment.dueDate)) && payment.status !== "paid") return "overdue";
+    // Use startOfDay to normalize dates to midnight for proper comparison
+    // This prevents payments due today from being marked as overdue
+    const today = startOfDay(new Date());
+    const dueDate = startOfDay(new Date(payment.dueDate));
+    if (dueDate < today && payment.status !== "paid") return "overdue";
     return "upcoming";
   };
 

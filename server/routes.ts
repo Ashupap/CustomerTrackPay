@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertCustomerSchema, insertPurchaseSchema, type InsertPayment } from "@shared/schema";
-import { addMonths, addYears, startOfMonth, startOfYear } from "date-fns";
+import { addMonths, addYears, startOfMonth, startOfYear, startOfDay } from "date-fns";
 import Papa from "papaparse";
 
 function requireAuth(req: any, res: any, next: any) {
@@ -27,6 +27,7 @@ function calculatePayments(
   }> = [];
 
   const now = new Date();
+  const today = startOfDay(now);
 
   // Add initial payment (always marked as paid on purchase date)
   if (initialPayment > 0) {
@@ -41,10 +42,11 @@ function calculatePayments(
   // For one-time rental, create only one rental payment
   if (rentalFrequency === "one-time") {
     const dueDate = purchaseDate;
+    const dueDateDay = startOfDay(new Date(dueDate));
     payments.push({
       amount: rentalAmount.toFixed(2),
       dueDate,
-      status: dueDate < now ? "overdue" : "upcoming",
+      status: dueDateDay < today ? "overdue" : "upcoming",
       paidDate: null,
     });
     return payments;
@@ -70,9 +72,10 @@ function calculatePayments(
   // Generate recurring rental payments
   for (let i = 0; i < numPayments; i++) {
     const dueDate = addPeriod!(purchaseDate, i + 1);
+    const dueDateDay = startOfDay(new Date(dueDate));
     
     let status = "upcoming";
-    if (dueDate < now) {
+    if (dueDateDay < today) {
       status = "overdue";
     }
     
@@ -233,11 +236,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const purchase = await storage.createPurchase(validated);
       
+      // Parse date as local date, not UTC
+      // Ensure we create a Date at midnight in the local timezone
+      const purchaseDate = validated.purchaseDate instanceof Date 
+        ? validated.purchaseDate 
+        : new Date(validated.purchaseDate);
+      const purchaseDateLocal = startOfDay(purchaseDate);
+      
       const paymentsToCreate = calculatePayments(
         parseFloat(validated.initialPayment),
         parseFloat(validated.rentalAmount),
         validated.rentalFrequency,
-        new Date(validated.purchaseDate)
+        purchaseDateLocal
       );
 
       for (const paymentData of paymentsToCreate) {

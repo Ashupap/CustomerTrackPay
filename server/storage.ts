@@ -549,7 +549,7 @@ export class SqliteStorage implements IStorage {
 
   async getThisMonthUpcomingPayments(userId: string): Promise<any[]> {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     
     const rows = this.db.prepare(`
@@ -568,11 +568,11 @@ export class SqliteStorage implements IStorage {
       INNER JOIN purchases pur ON p.purchase_id = pur.id
       INNER JOIN customers c ON pur.customer_id = c.id
       WHERE c.user_id = ?
-        AND p.status != 'paid'
+        AND p.status = 'upcoming'
         AND p.due_date >= ?
         AND p.due_date <= ?
       ORDER BY p.due_date ASC
-    `).all(userId, now.getTime(), endOfMonth.getTime()) as any[];
+    `).all(userId, startOfMonth.getTime(), endOfMonth.getTime()) as any[];
     
     return rows.map((row) => ({
       id: row.id,
@@ -589,8 +589,6 @@ export class SqliteStorage implements IStorage {
   }
 
   async getOverduePayments(userId: string): Promise<any[]> {
-    const now = new Date();
-    
     const rows = this.db.prepare(`
       SELECT 
         p.id,
@@ -607,10 +605,9 @@ export class SqliteStorage implements IStorage {
       INNER JOIN purchases pur ON p.purchase_id = pur.id
       INNER JOIN customers c ON pur.customer_id = c.id
       WHERE c.user_id = ?
-        AND p.status != 'paid'
-        AND p.due_date < ?
+        AND p.status = 'overdue'
       ORDER BY p.due_date ASC
-    `).all(userId, now.getTime()) as any[];
+    `).all(userId) as any[];
     
     return rows.map((row) => ({
       id: row.id,

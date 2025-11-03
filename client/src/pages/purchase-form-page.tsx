@@ -77,6 +77,9 @@ export default function PurchaseFormPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customers", customerId] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments/this-month-upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments/overdue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments/overdue-count"] });
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey[0] as string;
@@ -106,6 +109,9 @@ export default function PurchaseFormPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customers", customerId] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments/this-month-upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments/overdue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments/overdue-count"] });
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey[0] as string;

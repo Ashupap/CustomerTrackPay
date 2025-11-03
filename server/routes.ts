@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertCustomerSchema, insertPurchaseSchema } from "@shared/schema";
+import { insertCustomerSchema, insertPurchaseSchema, type InsertPayment } from "@shared/schema";
 import { addMonths, addYears, startOfMonth, startOfYear } from "date-fns";
 import Papa from "papaparse";
 
@@ -250,6 +250,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(purchase);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/purchases/:id", requireAuth, async (req, res) => {
+    try {
+      const purchase = await storage.getPurchase(req.params.id);
+      if (!purchase) {
+        return res.status(404).json({ message: "Purchase not found" });
+      }
+
+      const customer = await storage.getCustomer(purchase.customerId, req.user!.id);
+      if (!customer) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const validated = insertPurchaseSchema.partial().parse(req.body);
+      
+      // Prevent customerId changes (security - cross-tenant data breach)
+      if (validated.customerId && validated.customerId !== purchase.customerId) {
+        return res.status(403).json({ message: "Cannot change customer assignment" });
+      }
+
+      const updated = await storage.updatePurchase(req.params.id, validated);
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/payments/:id", requireAuth, async (req, res) => {
+    try {
+      const payment = await storage.getPayment(req.params.id);
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+
+      const purchase = await storage.getPurchase(payment.purchaseId);
+      if (!purchase) {
+        return res.status(404).json({ message: "Purchase not found" });
+      }
+
+      const customer = await storage.getCustomer(purchase.customerId, req.user!.id);
+      if (!customer) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Only allow updating amount and dueDate
+      const allowedUpdates: Partial<InsertPayment> = {};
+      if (req.body.amount !== undefined) {
+        allowedUpdates.amount = String(req.body.amount);
+      }
+      if (req.body.dueDate !== undefined) {
+        allowedUpdates.dueDate = new Date(req.body.dueDate);
+      }
+
+      const updated = await storage.updatePayment(req.params.id, allowedUpdates);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

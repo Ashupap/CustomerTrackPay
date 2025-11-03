@@ -1,8 +1,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation, Link } from "wouter";
-import { insertPurchaseSchema, InsertPurchase } from "@shared/schema";
+import { insertPurchaseSchema, InsertPurchase, Purchase } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
@@ -25,12 +25,24 @@ import {
 import { ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { useEffect } from "react";
 
 export default function PurchaseFormPage() {
-  const [, params] = useRoute("/customers/:customerId/purchase/new");
+  const [, newParams] = useRoute("/customers/:customerId/purchase/new");
+  const [, editParams] = useRoute("/customers/:customerId/purchase/:purchaseId/edit");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  const params = editParams || newParams;
   const customerId = params?.customerId;
+  const purchaseId = editParams?.purchaseId;
+  const isEdit = !!purchaseId;
+
+  const { data: purchase } = useQuery<Purchase>({
+    queryKey: ["/api/purchases", purchaseId],
+    enabled: isEdit,
+  });
 
   const form = useForm<InsertPurchase>({
     resolver: zodResolver(insertPurchaseSchema),
@@ -43,6 +55,19 @@ export default function PurchaseFormPage() {
       rentalFrequency: "monthly",
     },
   });
+
+  useEffect(() => {
+    if (purchase && isEdit) {
+      form.reset({
+        customerId: purchase.customerId,
+        product: purchase.product,
+        purchaseDate: new Date(purchase.purchaseDate),
+        initialPayment: purchase.initialPayment,
+        rentalAmount: purchase.rentalAmount,
+        rentalFrequency: purchase.rentalFrequency,
+      });
+    }
+  }, [purchase, isEdit, form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertPurchase) => {
@@ -73,8 +98,41 @@ export default function PurchaseFormPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (data: InsertPurchase) => {
+      const res = await apiRequest("PATCH", `/api/purchases/${purchaseId}`, data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", customerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0] as string;
+          return key?.startsWith("/api/kpi");
+        }
+      });
+      toast({
+        title: "Purchase updated",
+        description: "Purchase information has been updated successfully",
+      });
+      setLocation(`/customers/${customerId}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update purchase",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: InsertPurchase) => {
-    createMutation.mutate(data);
+    if (isEdit) {
+      updateMutation.mutate(data);
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   return (
@@ -90,9 +148,13 @@ export default function PurchaseFormPage() {
 
           <Card className="shadow-md">
             <CardHeader>
-              <CardTitle className="text-2xl">Add New Purchase</CardTitle>
+              <CardTitle className="text-2xl">
+                {isEdit ? "Edit Purchase" : "Add New Purchase"}
+              </CardTitle>
               <CardDescription>
-                Enter initial payment and recurring rental details
+                {isEdit 
+                  ? "Update purchase and rental information"
+                  : "Enter initial payment and recurring rental details"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -208,10 +270,14 @@ export default function PurchaseFormPage() {
                     <Button
                       type="submit"
                       className="flex-1"
-                      disabled={createMutation.isPending}
+                      disabled={createMutation.isPending || updateMutation.isPending}
                       data-testid="button-submit-purchase"
                     >
-                      {createMutation.isPending ? "Creating..." : "Create Purchase"}
+                      {(createMutation.isPending || updateMutation.isPending)
+                        ? "Saving..."
+                        : isEdit
+                        ? "Update Purchase"
+                        : "Create Purchase"}
                     </Button>
                     <Button
                       type="button"

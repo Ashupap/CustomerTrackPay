@@ -5,10 +5,102 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Plus, Check, Mail, Phone, Building2, DollarSign, Package, Calendar } from "lucide-react";
+import { ArrowLeft, Plus, Check, Mail, Phone, Building2, DollarSign, Package, Calendar, Edit2 } from "lucide-react";
 import { format, isPast, isFuture } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useState } from "react";
+
+function PaymentEditDialog({ payment, onSuccess }: { payment: Payment; onSuccess: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(payment.amount);
+  const [dueDate, setDueDate] = useState(format(new Date(payment.dueDate), "yyyy-MM-dd"));
+  const { toast } = useToast();
+
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("PATCH", `/api/payments/${payment.id}`, {
+        amount,
+        dueDate: new Date(dueDate),
+      });
+    },
+    onSuccess: () => {
+      setOpen(false);
+      onSuccess();
+      toast({
+        title: "Payment updated",
+        description: "Payment details have been updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update payment",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" data-testid={`button-edit-payment-${payment.id}`}>
+          <Edit2 className="h-3 w-3" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Payment</DialogTitle>
+          <DialogDescription>
+            Update payment amount and due date
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 pt-4">
+          <div className="space-y-2">
+            <Label htmlFor="amount">Amount</Label>
+            <Input
+              id="amount"
+              type="number"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              data-testid="input-payment-amount"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dueDate">Due Date</Label>
+            <Input
+              id="dueDate"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              data-testid="input-payment-due-date"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={() => editMutation.mutate()}
+              disabled={editMutation.isPending}
+              data-testid="button-save-payment"
+            >
+              {editMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function CustomerDetailPage() {
   const [, params] = useRoute("/customers/:id");
@@ -109,6 +201,15 @@ export default function CustomerDetailPage() {
                   <CardTitle className="text-2xl" data-testid="text-customer-name">{customer.name}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">Customer Information</p>
                 </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setLocation(`/customers/${customerId}/edit`)}
+                  data-testid="button-edit-customer"
+                >
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -185,6 +286,14 @@ export default function CustomerDetailPage() {
                           </span>
                         </div>
                       </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setLocation(`/customers/${customerId}/purchase/${purchase.id}/edit`)}
+                        data-testid={`button-edit-purchase-${purchase.id}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -220,16 +329,31 @@ export default function CustomerDetailPage() {
                               <div className="flex items-center gap-2">
                                 {getStatusBadge(status)}
                                 {status !== "paid" && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => markPaymentMutation.mutate(payment.id)}
-                                    disabled={markPaymentMutation.isPending}
-                                    data-testid={`button-mark-paid-${payment.id}`}
-                                  >
-                                    <Check className="h-3 w-3 mr-1" />
-                                    Mark Paid
-                                  </Button>
+                                  <>
+                                    <PaymentEditDialog 
+                                      payment={payment}
+                                      onSuccess={() => {
+                                        queryClient.invalidateQueries({ queryKey: ["/api/customers", customerId] });
+                                        queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+                                        queryClient.invalidateQueries({ 
+                                          predicate: (query) => {
+                                            const key = query.queryKey[0] as string;
+                                            return key?.startsWith("/api/kpi");
+                                          }
+                                        });
+                                      }}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => markPaymentMutation.mutate(payment.id)}
+                                      disabled={markPaymentMutation.isPending}
+                                      data-testid={`button-mark-paid-${payment.id}`}
+                                    >
+                                      <Check className="h-3 w-3 mr-1" />
+                                      Mark Paid
+                                    </Button>
+                                  </>
                                 )}
                               </div>
                             </div>

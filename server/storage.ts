@@ -33,6 +33,7 @@ export interface IStorage {
   getPurchase(id: string): Promise<Purchase | undefined>;
   getPurchasesByCustomer(customerId: string): Promise<Purchase[]>;
   createPurchase(purchase: InsertPurchase): Promise<Purchase>;
+  updatePurchase(id: string, purchase: Partial<InsertPurchase>): Promise<Purchase | undefined>;
   
   getPayment(id: string): Promise<Payment | undefined>;
   getPaymentsByPurchase(purchaseId: string): Promise<Payment[]>;
@@ -357,6 +358,47 @@ export class SqliteStorage implements IStorage {
     );
 
     return purchase;
+  }
+
+  async updatePurchase(id: string, updates: Partial<InsertPurchase>): Promise<Purchase | undefined> {
+    const existing = await this.getPurchase(id);
+    if (!existing) return undefined;
+
+    const updateFields: string[] = [];
+    const updateValues: any[] = [];
+
+    if (updates.product !== undefined) {
+      updateFields.push("product = ?");
+      updateValues.push(updates.product);
+    }
+    if (updates.purchaseDate !== undefined) {
+      updateFields.push("purchase_date = ?");
+      const purchaseDate = typeof updates.purchaseDate === 'string' 
+        ? new Date(updates.purchaseDate)
+        : updates.purchaseDate;
+      updateValues.push(purchaseDate.getTime());
+    }
+    if (updates.initialPayment !== undefined) {
+      updateFields.push("initial_payment = ?");
+      updateValues.push(updates.initialPayment);
+    }
+    if (updates.rentalAmount !== undefined) {
+      updateFields.push("rental_amount = ?");
+      updateValues.push(updates.rentalAmount);
+    }
+    if (updates.rentalFrequency !== undefined) {
+      updateFields.push("rental_frequency = ?");
+      updateValues.push(updates.rentalFrequency);
+    }
+
+    if (updateFields.length === 0) return existing;
+
+    updateValues.push(id);
+    this.db.prepare(
+      `UPDATE purchases SET ${updateFields.join(", ")} WHERE id = ?`
+    ).run(...updateValues);
+
+    return await this.getPurchase(id);
   }
 
   async getPayment(id: string): Promise<Payment | undefined> {

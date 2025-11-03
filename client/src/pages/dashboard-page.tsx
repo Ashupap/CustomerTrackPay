@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DollarSign, AlertCircle, Plus, Search, Eye, LogOut, Upload, CheckCircle, XCircle } from "lucide-react";
+import { DollarSign, AlertCircle, Plus, Search, Eye, LogOut, Upload, CheckCircle, XCircle, Edit2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -470,12 +470,20 @@ export default function DashboardPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Link href={`/customers/${customer.id}`}>
-                            <Button variant="ghost" size="sm" data-testid={`button-view-${customer.id}`}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View
-                            </Button>
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            <Link href={`/customers/${customer.id}/edit`}>
+                              <Button variant="ghost" size="sm" data-testid={`button-edit-${customer.id}`}>
+                                <Edit2 className="h-4 w-4 mr-2" />
+                                Edit
+                              </Button>
+                            </Link>
+                            <Link href={`/customers/${customer.id}`}>
+                              <Button variant="ghost" size="sm" data-testid={`button-view-${customer.id}`}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View
+                              </Button>
+                            </Link>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

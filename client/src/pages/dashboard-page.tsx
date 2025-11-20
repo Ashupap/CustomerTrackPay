@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DollarSign, AlertCircle, Plus, Search, Eye, LogOut, Upload, CheckCircle, XCircle, Edit2, Mail, Phone, ShoppingCart } from "lucide-react";
+import { DollarSign, AlertCircle, Plus, Search, LogOut, Upload, CheckCircle, XCircle, Edit2, Mail, Phone, ShoppingCart } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -594,7 +594,12 @@ export default function DashboardPage() {
                     </TableRow>
                   ) : (
                     filteredCustomers?.map((customer) => (
-                      <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
+                      <TableRow 
+                        key={customer.id} 
+                        className="cursor-pointer hover-elevate active-elevate-2"
+                        onClick={() => setLocation(`/customers/${customer.id}`)}
+                        data-testid={`row-customer-${customer.id}`}
+                      >
                         <TableCell className="font-medium">{customer.name}</TableCell>
                         <TableCell className="text-sm">{customer.company || "-"}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
@@ -621,45 +626,30 @@ export default function DashboardPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1 sm:gap-2">
-                            <Link href={`/customers/${customer.id}/purchase/new`}>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-8 w-8"
-                                data-testid={`button-add-purchase-${customer.id}`}
-                              >
-                                <ShoppingCart className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            <Link href={`/customers/${customer.id}/edit`}>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-8 w-8"
-                                data-testid={`button-edit-${customer.id}`}
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            <Link href={`/customers/${customer.id}`}>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                className="hidden sm:flex"
-                                data-testid={`button-view-${customer.id}`}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-8 w-8 sm:hidden"
-                                data-testid={`button-view-mobile-${customer.id}`}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </Link>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLocation(`/customers/${customer.id}/purchase/new`);
+                              }}
+                              data-testid={`button-add-purchase-${customer.id}`}
+                            >
+                              <ShoppingCart className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLocation(`/customers/${customer.id}/edit`);
+                              }}
+                              data-testid={`button-edit-${customer.id}`}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>

@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DollarSign, AlertCircle, Plus, Search, Eye, LogOut, Upload, CheckCircle, XCircle, Edit2 } from "lucide-react";
+import { DollarSign, AlertCircle, Plus, Search, Eye, LogOut, Upload, CheckCircle, XCircle, Edit2, Mail, Phone } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -186,7 +186,7 @@ export default function DashboardPage() {
                 <div className="flex items-baseline justify-between">
                   <div>
                     <div className="text-4xl font-bold" data-testid="text-total-paid">
-                      ${kpiData?.totalPaid.toLocaleString() ?? "0"}
+                      ${kpiData?.totalPaid?.toLocaleString() ?? "0"}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Collected from customers
@@ -222,7 +222,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-4xl font-bold text-destructive" data-testid="text-total-overdue">
-                  ${kpiData?.totalOverdue.toLocaleString() ?? "0"}
+                  ${kpiData?.totalOverdue?.toLocaleString() ?? "0"}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Requires immediate attention
@@ -290,13 +290,13 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                           {payment.email && (
                             <div className="flex items-center gap-1.5 text-muted-foreground truncate">
-                              <span className="text-xs">✉</span>
+                              <Mail className="h-3 w-3 flex-shrink-0" />
                               <span className="truncate">{payment.email}</span>
                             </div>
                           )}
                           {payment.phone && (
                             <div className="flex items-center gap-1.5 text-muted-foreground truncate">
-                              <span className="text-xs">☎</span>
+                              <Phone className="h-3 w-3 flex-shrink-0" />
                               <span>{payment.phone}</span>
                             </div>
                           )}
@@ -376,13 +376,13 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                           {payment.email && (
                             <div className="flex items-center gap-1.5 text-muted-foreground truncate">
-                              <span className="text-xs">✉</span>
+                              <Mail className="h-3 w-3 flex-shrink-0" />
                               <span className="truncate">{payment.email}</span>
                             </div>
                           )}
                           {payment.phone && (
                             <div className="flex items-center gap-1.5 text-muted-foreground truncate">
-                              <span className="text-xs">☎</span>
+                              <Phone className="h-3 w-3 flex-shrink-0" />
                               <span>{payment.phone}</span>
                             </div>
                           )}

@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ShoppingCart, Plus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -51,8 +51,15 @@ export default function PurchaseFormPage() {
     enabled: isGlobalNew,
   });
 
+  const formSchema = isGlobalNew
+    ? insertPurchaseSchema.refine((data) => data.customerId && data.customerId !== "", {
+        message: "Please select a customer",
+        path: ["customerId"],
+      })
+    : insertPurchaseSchema;
+
   const form = useForm<InsertPurchase>({
-    resolver: zodResolver(insertPurchaseSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       customerId: customerId || "",
       product: "",
@@ -153,6 +160,8 @@ export default function PurchaseFormPage() {
     }
   };
 
+  const hasNoCustomers = isGlobalNew && customers && customers.length === 0;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -164,18 +173,42 @@ export default function PurchaseFormPage() {
             </Button>
           </Link>
 
-          <Card className="shadow-md">
-            <CardHeader>
-              <CardTitle className="text-xl sm:text-2xl">
-                {isEdit ? "Edit Purchase" : "Add New Purchase"}
-              </CardTitle>
-              <CardDescription>
-                {isEdit 
-                  ? "Update purchase and rental information"
-                  : "Enter initial payment and recurring rental details"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          {hasNoCustomers ? (
+            <Card className="shadow-md">
+              <CardContent className="pt-12 pb-12">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                    <ShoppingCart className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">No Customers Yet</h3>
+                  <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+                    You need to add at least one customer before you can create a purchase.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                    <Button onClick={() => setLocation("/customers/new")} data-testid="button-add-first-customer">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Your First Customer
+                    </Button>
+                    <Button variant="outline" onClick={() => setLocation("/")} data-testid="button-back-to-dashboard">
+                      Back to Dashboard
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="shadow-md">
+              <CardHeader>
+                <CardTitle className="text-xl sm:text-2xl">
+                  {isEdit ? "Edit Purchase" : "Add New Purchase"}
+                </CardTitle>
+                <CardDescription>
+                  {isEdit 
+                    ? "Update purchase and rental information"
+                    : "Enter initial payment and recurring rental details"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   {isGlobalNew && (
@@ -185,18 +218,24 @@ export default function PurchaseFormPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Customer *</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-customer">
                                 <SelectValue placeholder="Select a customer" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {customers?.map((customer) => (
-                                <SelectItem key={customer.id} value={customer.id.toString()}>
-                                  {customer.name} {customer.company ? `(${customer.company})` : ''}
-                                </SelectItem>
-                              ))}
+                              {customers && customers.length === 0 ? (
+                                <div className="p-4 text-center text-sm text-muted-foreground">
+                                  No customers found. Please add a customer first.
+                                </div>
+                              ) : (
+                                customers?.map((customer) => (
+                                  <SelectItem key={customer.id} value={customer.id.toString()}>
+                                    {customer.name} {customer.company ? `(${customer.company})` : ''}
+                                  </SelectItem>
+                                ))
+                              )}
                             </SelectContent>
                           </Select>
                           <FormDescription>Choose which customer this purchase is for</FormDescription>
@@ -339,6 +378,7 @@ export default function PurchaseFormPage() {
               </Form>
             </CardContent>
           </Card>
+          )}
         </div>
       </div>
     </div>

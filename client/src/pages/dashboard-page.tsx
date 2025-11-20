@@ -231,126 +231,178 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {thisMonthUpcomingPayments && thisMonthUpcomingPayments.length > 0 && (
-              <Card className="shadow-md border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    This Month's Upcoming Payments
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Upcoming Payments Section - Always Visible */}
+            <Card className="shadow-md border-blue-200 dark:border-blue-800">
+              <CardHeader className="border-b bg-blue-50 dark:bg-blue-950/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                    <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900">
+                      <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <div>This Month's Upcoming</div>
+                      <div className="text-xs font-normal text-muted-foreground mt-0.5">
+                        Payments due this month
+                      </div>
+                    </div>
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3" data-testid="list-upcoming-payments">
+                  {thisMonthUpcomingPayments && thisMonthUpcomingPayments.length > 0 && (
+                    <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700">
+                      {thisMonthUpcomingPayments.length} {thisMonthUpcomingPayments.length === 1 ? 'payment' : 'payments'}
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                {thisMonthUpcomingPayments && thisMonthUpcomingPayments.length > 0 ? (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2" data-testid="list-upcoming-payments">
                     {thisMonthUpcomingPayments.map((payment) => (
                       <div
                         key={payment.id}
-                        className="p-3 bg-background rounded-md border hover-elevate"
+                        className="p-4 bg-card rounded-lg border border-border hover-elevate active-elevate-2 transition-all"
                         data-testid={`payment-upcoming-${payment.id}`}
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <Link
-                            to={`/customers/${payment.customerId}`}
-                            className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                            data-testid={`link-customer-${payment.customerId}`}
-                          >
-                            {payment.customerName}
-                          </Link>
-                          <div className="font-semibold text-lg" data-testid={`text-amount-${payment.id}`}>
-                            ${parseFloat(payment.amount).toLocaleString()}
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <Link
+                              to={`/customers/${payment.customerId}`}
+                              className="font-semibold text-base text-blue-600 dark:text-blue-400 hover:underline block truncate"
+                              data-testid={`link-customer-${payment.customerId}`}
+                            >
+                              {payment.customerName}
+                            </Link>
+                            {payment.company && (
+                              <div className="text-sm text-muted-foreground mt-0.5 truncate">
+                                {payment.company}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-bold text-xl text-blue-600 dark:text-blue-400" data-testid={`text-amount-${payment.id}`}>
+                              ${parseFloat(payment.amount).toLocaleString()}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              Due {format(new Date(payment.dueDate), "MMM d")}
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          {payment.company && (
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">Company:</span>
-                              <span>{payment.company}</span>
-                            </div>
-                          )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                           {payment.email && (
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">Email:</span>
-                              <span>{payment.email}</span>
+                            <div className="flex items-center gap-1.5 text-muted-foreground truncate">
+                              <span className="text-xs">✉</span>
+                              <span className="truncate">{payment.email}</span>
                             </div>
                           )}
                           {payment.phone && (
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">Phone:</span>
+                            <div className="flex items-center gap-1.5 text-muted-foreground truncate">
+                              <span className="text-xs">☎</span>
                               <span>{payment.phone}</span>
                             </div>
                           )}
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">Due:</span>
-                            <span>{format(new Date(payment.dueDate), "MMM d, yyyy")}</span>
-                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <div className="text-center py-12" data-testid="empty-upcoming-payments">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900 mb-4">
+                      <CheckCircle className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <h3 className="text-base font-medium mb-1">No Upcoming Payments</h3>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                      You're all caught up! No payments are due this month.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-            {overduePayments && overduePayments.length > 0 && (
-              <Card className="shadow-md border-red-200 bg-red-50 dark:bg-red-950 dark:border-red-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-                    Overdue Payments
+            {/* Overdue Payments Section - Always Visible */}
+            <Card className="shadow-md border-destructive/20">
+              <CardHeader className="border-b bg-destructive/5">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                    <div className="p-2 rounded-md bg-destructive/10">
+                      <AlertCircle className="h-5 w-5 text-destructive" />
+                    </div>
+                    <div>
+                      <div>Overdue Payments</div>
+                      <div className="text-xs font-normal text-muted-foreground mt-0.5">
+                        Require immediate attention
+                      </div>
+                    </div>
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3" data-testid="list-overdue-payments">
+                  {overduePayments && overduePayments.length > 0 && (
+                    <Badge variant="destructive">
+                      {overduePayments.length} {overduePayments.length === 1 ? 'payment' : 'payments'}
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                {overduePayments && overduePayments.length > 0 ? (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2" data-testid="list-overdue-payments">
                     {overduePayments.map((payment) => (
                       <div
                         key={payment.id}
-                        className="p-3 bg-background rounded-md border hover-elevate"
+                        className="p-4 bg-card rounded-lg border border-destructive/20 hover-elevate active-elevate-2 transition-all"
                         data-testid={`payment-overdue-${payment.id}`}
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <Link
-                            to={`/customers/${payment.customerId}`}
-                            className="font-medium text-red-600 dark:text-red-400 hover:underline"
-                            data-testid={`link-customer-${payment.customerId}`}
-                          >
-                            {payment.customerName}
-                          </Link>
-                          <div className="font-semibold text-lg text-red-600 dark:text-red-400" data-testid={`text-amount-${payment.id}`}>
-                            ${parseFloat(payment.amount).toLocaleString()}
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <Link
+                              to={`/customers/${payment.customerId}`}
+                              className="font-semibold text-base text-destructive hover:underline block truncate"
+                              data-testid={`link-customer-${payment.customerId}`}
+                            >
+                              {payment.customerName}
+                            </Link>
+                            {payment.company && (
+                              <div className="text-sm text-muted-foreground mt-0.5 truncate">
+                                {payment.company}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-bold text-xl text-destructive" data-testid={`text-amount-${payment.id}`}>
+                              ${parseFloat(payment.amount).toLocaleString()}
+                            </div>
+                            <div className="text-xs text-destructive/70 mt-0.5 font-medium">
+                              Since {format(new Date(payment.dueDate), "MMM d")}
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          {payment.company && (
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">Company:</span>
-                              <span>{payment.company}</span>
-                            </div>
-                          )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                           {payment.email && (
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">Email:</span>
-                              <span>{payment.email}</span>
+                            <div className="flex items-center gap-1.5 text-muted-foreground truncate">
+                              <span className="text-xs">✉</span>
+                              <span className="truncate">{payment.email}</span>
                             </div>
                           )}
                           {payment.phone && (
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">Phone:</span>
+                            <div className="flex items-center gap-1.5 text-muted-foreground truncate">
+                              <span className="text-xs">☎</span>
                               <span>{payment.phone}</span>
                             </div>
                           )}
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">Overdue since:</span>
-                            <span className="text-red-600 dark:text-red-400 font-medium">
-                              {format(new Date(payment.dueDate), "MMM d, yyyy")}
-                            </span>
-                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <div className="text-center py-12" data-testid="empty-overdue-payments">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900 mb-4">
+                      <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                    </div>
+                    <h3 className="text-base font-medium mb-1">All Clear!</h3>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                      Great job! You have no overdue payments at the moment.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           <div className="space-y-4">

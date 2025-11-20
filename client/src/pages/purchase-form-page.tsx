@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation, Link } from "wouter";
-import { insertPurchaseSchema, InsertPurchase, Purchase } from "@shared/schema";
+import { insertPurchaseSchema, InsertPurchase, Purchase, CustomerSummary } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
@@ -29,19 +29,26 @@ import { format } from "date-fns";
 import { useEffect } from "react";
 
 export default function PurchaseFormPage() {
-  const [, newParams] = useRoute("/customers/:customerId/purchase/new");
+  const [, globalNewParams] = useRoute("/purchases/new");
+  const [, customerNewParams] = useRoute("/customers/:customerId/purchase/new");
   const [, editParams] = useRoute("/customers/:customerId/purchase/:purchaseId/edit");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
-  const params = editParams || newParams;
+  const params = editParams || customerNewParams;
   const customerId = params?.customerId;
   const purchaseId = editParams?.purchaseId;
   const isEdit = !!purchaseId;
+  const isGlobalNew = !!globalNewParams;
 
   const { data: purchase } = useQuery<Purchase>({
     queryKey: ["/api/purchases", purchaseId],
     enabled: isEdit,
+  });
+
+  const { data: customers } = useQuery<CustomerSummary[]>({
+    queryKey: ["/api/customers"],
+    enabled: isGlobalNew,
   });
 
   const form = useForm<InsertPurchase>({
@@ -74,8 +81,9 @@ export default function PurchaseFormPage() {
       const res = await apiRequest("POST", "/api/purchases", data);
       return await res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/customers", customerId] });
+    onSuccess: (_, variables) => {
+      const targetCustomerId = variables.customerId;
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", targetCustomerId] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments/this-month-upcoming"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments/overdue"] });
@@ -90,7 +98,11 @@ export default function PurchaseFormPage() {
         title: "Purchase added",
         description: "Purchase and payment schedule have been created successfully",
       });
-      setLocation(`/customers/${customerId}`);
+      if (isGlobalNew) {
+        setLocation("/");
+      } else {
+        setLocation(`/customers/${targetCustomerId}`);
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -143,18 +155,18 @@ export default function PurchaseFormPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-6 py-8">
-        <div className="space-y-6">
-          <Link href={`/customers/${customerId}`}>
-            <Button variant="outline" data-testid="button-back">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="space-y-4 sm:space-y-6">
+          <Link href={isGlobalNew ? "/" : `/customers/${customerId}`}>
+            <Button variant="outline" size="sm" data-testid="button-back">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Customer
+              {isGlobalNew ? "Back to Dashboard" : "Back to Customer"}
             </Button>
           </Link>
 
           <Card className="shadow-md">
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-xl sm:text-2xl">
                 {isEdit ? "Edit Purchase" : "Add New Purchase"}
               </CardTitle>
               <CardDescription>
@@ -166,6 +178,34 @@ export default function PurchaseFormPage() {
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  {isGlobalNew && (
+                    <FormField
+                      control={form.control}
+                      name="customerId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Customer *</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-customer">
+                                <SelectValue placeholder="Select a customer" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {customers?.map((customer) => (
+                                <SelectItem key={customer.id} value={customer.id.toString()}>
+                                  {customer.name} {customer.company ? `(${customer.company})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>Choose which customer this purchase is for</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
                   <FormField
                     control={form.control}
                     name="product"
@@ -272,10 +312,19 @@ export default function PurchaseFormPage() {
                     )}
                   />
 
-                  <div className="flex gap-2 pt-4">
+                  <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      onClick={() => setLocation(isGlobalNew ? "/" : `/customers/${customerId}`)}
+                      data-testid="button-cancel"
+                    >
+                      Cancel
+                    </Button>
                     <Button
                       type="submit"
-                      className="flex-1"
+                      className="w-full sm:flex-1"
                       disabled={createMutation.isPending || updateMutation.isPending}
                       data-testid="button-submit-purchase"
                     >
@@ -284,13 +333,6 @@ export default function PurchaseFormPage() {
                         : isEdit
                         ? "Update Purchase"
                         : "Create Purchase"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setLocation(`/customers/${customerId}`)}
-                    >
-                      Cancel
                     </Button>
                   </div>
                 </form>

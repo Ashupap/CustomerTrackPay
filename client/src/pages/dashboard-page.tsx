@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DollarSign, AlertCircle, Plus, Search, Eye, LogOut, Upload, CheckCircle, XCircle, Edit2, Mail, Phone } from "lucide-react";
+import { DollarSign, AlertCircle, Plus, Search, Eye, LogOut, Upload, CheckCircle, XCircle, Edit2, Mail, Phone, ShoppingCart } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -418,9 +418,9 @@ export default function DashboardPage() {
                   data-testid="input-search-customers"
                 />
               </div>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 flex-wrap w-full sm:w-auto">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-40" data-testid="select-status-filter">
+                  <SelectTrigger className="w-full sm:w-40" data-testid="select-status-filter">
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -531,9 +531,25 @@ export default function DashboardPage() {
                   </DialogContent>
                 </Dialog>
 
-                <Button onClick={() => setLocation("/customers/new")} data-testid="button-add-customer">
+                <Button 
+                  onClick={() => setLocation("/purchases/new")} 
+                  variant="outline"
+                  className="flex-1 sm:flex-none"
+                  data-testid="button-add-purchase"
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Add Purchase</span>
+                  <span className="sm:hidden">Purchase</span>
+                </Button>
+
+                <Button 
+                  onClick={() => setLocation("/customers/new")} 
+                  className="flex-1 sm:flex-none"
+                  data-testid="button-add-customer"
+                >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Customer
+                  <span className="hidden sm:inline">Add Customer</span>
+                  <span className="sm:hidden">Customer</span>
                 </Button>
               </div>
             </div>
@@ -604,17 +620,44 @@ export default function DashboardPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1 sm:gap-2">
+                            <Link href={`/customers/${customer.id}/purchase/new`}>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="h-8 w-8"
+                                data-testid={`button-add-purchase-${customer.id}`}
+                              >
+                                <ShoppingCart className="h-4 w-4" />
+                              </Button>
+                            </Link>
                             <Link href={`/customers/${customer.id}/edit`}>
-                              <Button variant="ghost" size="sm" data-testid={`button-edit-${customer.id}`}>
-                                <Edit2 className="h-4 w-4 mr-2" />
-                                Edit
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="h-8 w-8"
+                                data-testid={`button-edit-${customer.id}`}
+                              >
+                                <Edit2 className="h-4 w-4" />
                               </Button>
                             </Link>
                             <Link href={`/customers/${customer.id}`}>
-                              <Button variant="ghost" size="sm" data-testid={`button-view-${customer.id}`}>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="hidden sm:flex"
+                                data-testid={`button-view-${customer.id}`}
+                              >
                                 <Eye className="h-4 w-4 mr-2" />
                                 View
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="h-8 w-8 sm:hidden"
+                                data-testid={`button-view-mobile-${customer.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
                               </Button>
                             </Link>
                           </div>

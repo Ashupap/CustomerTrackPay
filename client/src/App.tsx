@@ -20,6 +20,7 @@ function Router() {
       <ProtectedRoute path="/customers/new" component={CustomerFormPage} />
       <ProtectedRoute path="/customers/:id" component={CustomerDetailPage} />
       <ProtectedRoute path="/customers/:id/edit" component={CustomerFormPage} />
+      <ProtectedRoute path="/purchases/new" component={PurchaseFormPage} />
       <ProtectedRoute path="/customers/:customerId/purchase/new" component={PurchaseFormPage} />
       <ProtectedRoute path="/customers/:customerId/purchase/:purchaseId/edit" component={PurchaseFormPage} />
       <Route path="/auth" component={AuthPage} />

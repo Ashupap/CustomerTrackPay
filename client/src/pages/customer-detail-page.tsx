@@ -309,14 +309,14 @@ export default function CustomerDetailPage() {
                           return (
                             <div
                               key={payment.id}
-                              className="flex items-center justify-between p-3 rounded-md bg-muted/50"
+                              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-md bg-muted/50"
                               data-testid={`payment-${payment.id}`}
                             >
-                              <div className="flex items-center gap-4">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background text-xs font-medium">
+                              <div className="flex items-center gap-4 min-w-0">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background text-xs font-medium shrink-0">
                                   {index + 1}
                                 </div>
-                                <div>
+                                <div className="min-w-0 flex-1">
                                   <p className="text-sm font-medium">
                                     ${parseFloat(payment.amount).toLocaleString()}
                                   </p>
@@ -330,7 +330,7 @@ export default function CustomerDetailPage() {
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 shrink-0">
                                 {getStatusBadge(status)}
                                 {status !== "paid" && (
                                   <>
@@ -354,8 +354,8 @@ export default function CustomerDetailPage() {
                                       disabled={markPaymentMutation.isPending}
                                       data-testid={`button-mark-paid-${payment.id}`}
                                     >
-                                      <Check className="h-3 w-3 mr-1" />
-                                      Mark Paid
+                                      <Check className="h-3 w-3 sm:mr-1" />
+                                      <span className="hidden sm:inline">Mark Paid</span>
                                     </Button>
                                   </>
                                 )}

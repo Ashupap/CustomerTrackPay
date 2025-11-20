@@ -349,13 +349,12 @@ export default function CustomerDetailPage() {
                                     />
                                     <Button
                                       size="sm"
-                                      variant="outline"
                                       onClick={() => markPaymentMutation.mutate(payment.id)}
                                       disabled={markPaymentMutation.isPending}
                                       data-testid={`button-mark-paid-${payment.id}`}
                                     >
-                                      <Check className="h-3 w-3 sm:mr-1" />
                                       <span className="hidden sm:inline">Mark Paid</span>
+                                      <span className="sm:hidden">Paid</span>
                                     </Button>
                                   </>
                                 )}

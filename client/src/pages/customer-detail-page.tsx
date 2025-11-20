@@ -232,7 +232,13 @@ export default function CustomerDetailPage() {
                     <Mail className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">Email</p>
-                      <p className="text-sm font-medium">{customer.email}</p>
+                      <a 
+                        href={`mailto:${customer.email}`}
+                        className="text-sm font-medium text-primary hover:underline"
+                        data-testid="link-customer-email"
+                      >
+                        {customer.email}
+                      </a>
                     </div>
                   </div>
                 )}
@@ -241,7 +247,13 @@ export default function CustomerDetailPage() {
                     <Phone className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">Phone</p>
-                      <p className="text-sm font-medium">{customer.phone}</p>
+                      <a 
+                        href={`tel:${customer.phone}`}
+                        className="text-sm font-medium text-primary hover:underline"
+                        data-testid="link-customer-phone"
+                      >
+                        {customer.phone}
+                      </a>
                     </div>
                   </div>
                 )}

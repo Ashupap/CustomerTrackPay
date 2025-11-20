@@ -25,14 +25,15 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 ### Key Features
 -   **Dark Mode**: Full support with system-wide theme toggle and persistence.
 -   **Authentication & Security**: Scrypt hashing, session-based authentication, protected routes, minimal login page.
--   **Dashboard**: KPI cards (Total Payments Received, Total Overdue), searchable customer table with status filters and quick payment views.
+-   **Dashboard**: KPI cards (Total Payments Received, Total Overdue), searchable customer table with status filters and quick payment views. Global "Add Purchase" action and individual quick-add purchase buttons for each customer.
 -   **Customer Management**: CRUD operations for customers, viewing purchase and payment history.
--   **Purchase & Payment Tracking**: Creation of rental purchases with automated payment schedule generation based on flexible frequencies (monthly/quarterly/yearly/one-time), visual payment timelines, and one-click status updates.
+-   **Purchase & Payment Tracking**: Creation of rental purchases with automated payment schedule generation based on flexible frequencies (monthly/quarterly/yearly/one-time), visual payment timelines, and one-click status updates. Supports both global purchase creation (with customer selection) and customer-specific purchase creation.
 -   **Payment Schedule Calculation**: Automated calculation of initial and recurring payments, including overdue detection.
 -   **Comprehensive Edit Functionality**: Allows editing of customers, purchases, and payments with security restrictions.
 -   **CSV Bulk Customer Import**: Functionality to upload and import customer data from CSV files with validation.
 -   **Payment Reminders & Alerts**: Dashboard alerts for upcoming payments and overdue counts.
 -   **Timezone Bug Fix**: Corrected payment status calculation to accurately reflect "upcoming" for same-day payments, addressing timezone-related discrepancies.
+-   **Mobile-First Design**: Touch-friendly interface with 44px minimum touch targets, responsive button stacking, full-width primary actions on mobile, adaptive text sizing, and icon-only actions on small screens.
 
 ### File Structure
 The project is organized into `client/` (React frontend), `server/` (Node.js backend), and `shared/` (shared types and validation) directories.

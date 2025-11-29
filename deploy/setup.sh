@@ -94,8 +94,7 @@ echo -e "${GREEN}[6/8] Installing dependencies and building...${NC}"
 npm install
 npm run build
 
-# Create data directory for SQLite
-mkdir -p ${APP_DIR}/data
+# SQLite database will be created in the app directory automatically
 
 # Create .env file if not exists
 if [ ! -f "${APP_DIR}/.env" ]; then

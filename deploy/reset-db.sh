@@ -8,7 +8,7 @@
 set -e
 
 APP_DIR="/var/www/paytrack"
-DB_FILE="${APP_DIR}/data/paytrack.db"
+DB_FILE="${APP_DIR}/paytrack.db"
 BACKUP_DIR="/var/backups/paytrack"
 
 RED='\033[0;31m'

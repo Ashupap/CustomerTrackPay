@@ -113,9 +113,9 @@ if [ "$ACTION" = "backup" ]; then
     
     mkdir -p $BACKUP_DIR
     
-    if [ -f "$APP_DIR/data/paytrack.db" ]; then
+    if [ -f "$APP_DIR/paytrack.db" ]; then
         print_status "Backing up database..."
-        cp "$APP_DIR/data/paytrack.db" "$BACKUP_DIR/paytrack_${TIMESTAMP}.db"
+        cp "$APP_DIR/paytrack.db" "$BACKUP_DIR/paytrack_${TIMESTAMP}.db"
         
         # Keep only last 7 backups
         ls -t $BACKUP_DIR/paytrack_*.db | tail -n +8 | xargs -r rm
@@ -123,7 +123,7 @@ if [ "$ACTION" = "backup" ]; then
         print_status "Backup saved to $BACKUP_DIR/paytrack_${TIMESTAMP}.db"
         ls -la $BACKUP_DIR
     else
-        print_error "Database file not found at $APP_DIR/data/paytrack.db"
+        print_error "Database file not found at $APP_DIR/paytrack.db"
         exit 1
     fi
 fi

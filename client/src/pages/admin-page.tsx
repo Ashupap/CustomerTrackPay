@@ -75,6 +75,8 @@ export default function AdminPage() {
 
   const { data: roleData, isLoading: roleLoading } = useQuery<{ role: string; isAdmin: boolean }>({
     queryKey: ["/api/user/role"],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: users, isLoading: usersLoading } = useQuery<UserWithStats[]>({

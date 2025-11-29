@@ -79,6 +79,8 @@ export default function DashboardPage() {
 
   const { data: roleData } = useQuery<{ role: string; isAdmin: boolean }>({
     queryKey: ["/api/user/role"],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const filteredCustomers = customers?.filter((customer) => {

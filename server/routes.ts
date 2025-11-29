@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth, hashPassword } from "./auth";
+import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import { storage } from "./storage";
 import { insertCustomerSchema, insertPurchaseSchema, createUserSchema, type InsertPayment } from "@shared/schema";
 import { addMonths, addYears, startOfMonth, startOfYear, startOfDay } from "date-fns";
@@ -529,6 +529,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const isAdmin = await storage.isAdmin(req.user!.id);
       res.json({ role: isAdmin ? 'admin' : 'user', isAdmin });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // User self-service password change
+  app.post("/api/user/change-password", requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current password and new password are required" });
+      }
+      
+      if (typeof newPassword !== 'string' || newPassword.length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters" });
+      }
+      
+      // Verify current password
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Verify current password
+      const isValidPassword = await comparePasswords(currentPassword, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+      
+      // Hash and update the new password
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.resetUserPassword(req.user!.id, hashedPassword);
+      
+      res.json({ message: "Password changed successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Plus, Check, Mail, Phone, Building2, DollarSign, Package, Calendar, Edit2 } from "lucide-react";
+import { ArrowLeft, Plus, Check, Mail, Phone, Building2, IndianRupee, Package, Calendar, Edit2 } from "lucide-react";
 import { format, isPast, isFuture, startOfDay } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -293,12 +293,12 @@ export default function CustomerDetailPage() {
                             {format(new Date(purchase.purchaseDate), "MMM dd, yyyy")}
                           </span>
                           <span className="flex items-center gap-1">
-                            <DollarSign className="h-3 w-3" />
-                            Initial: ${parseFloat(purchase.initialPayment).toLocaleString()}
+                            <IndianRupee className="h-3 w-3" />
+                            Initial: ₹{parseFloat(purchase.initialPayment).toLocaleString()}
                           </span>
                           <span className="flex items-center gap-1">
-                            <DollarSign className="h-3 w-3" />
-                            Rental: ${parseFloat(purchase.rentalAmount).toLocaleString()} {purchase.rentalFrequency}
+                            <IndianRupee className="h-3 w-3" />
+                            Rental: ₹{parseFloat(purchase.rentalAmount).toLocaleString()} {purchase.rentalFrequency}
                           </span>
                         </div>
                       </div>
@@ -330,7 +330,7 @@ export default function CustomerDetailPage() {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <p className="text-sm font-medium">
-                                    ${parseFloat(payment.amount).toLocaleString()}
+                                    ₹{parseFloat(payment.amount).toLocaleString()}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
                                     Due: {format(new Date(payment.dueDate), "MMM dd, yyyy")}

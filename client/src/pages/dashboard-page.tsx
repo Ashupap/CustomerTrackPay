@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DollarSign, AlertCircle, Plus, Search, LogOut, Upload, CheckCircle, XCircle, Edit2, Mail, Phone, ShoppingCart, Shield, Key } from "lucide-react";
+import { IndianRupee, AlertCircle, Plus, Search, LogOut, Upload, CheckCircle, XCircle, Edit2, Mail, Phone, ShoppingCart, Shield, Key } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -198,7 +198,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary">
-                <DollarSign className="h-4 w-4 text-primary-foreground" />
+                <IndianRupee className="h-4 w-4 text-primary-foreground" />
               </div>
               <h1 className="text-xl font-medium" data-testid="text-app-name">PayTrack</h1>
             </div>
@@ -320,13 +320,13 @@ export default function DashboardPage() {
                 <CardTitle className="text-sm font-semibold uppercase tracking-wide">
                   Total Payments Received
                 </CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <IndianRupee className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="flex items-baseline justify-between">
                   <div>
                     <div className="text-4xl font-bold" data-testid="text-total-paid">
-                      ${kpiData?.totalPaid?.toLocaleString() ?? "0"}
+                      ₹{kpiData?.totalPaid?.toLocaleString() ?? "0"}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Collected from customers
@@ -362,7 +362,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-4xl font-bold text-destructive" data-testid="text-total-overdue">
-                  ${kpiData?.totalOverdue?.toLocaleString() ?? "0"}
+                  ₹{kpiData?.totalOverdue?.toLocaleString() ?? "0"}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Requires immediate attention
@@ -420,7 +420,7 @@ export default function DashboardPage() {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <div className="font-bold text-xl text-blue-600 dark:text-blue-400" data-testid={`text-amount-${payment.id}`}>
-                              ${parseFloat(payment.amount).toLocaleString()}
+                              ₹{parseFloat(payment.amount).toLocaleString()}
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5">
                               Due {format(new Date(payment.dueDate), "MMM d")}
@@ -506,7 +506,7 @@ export default function DashboardPage() {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <div className="font-bold text-xl text-destructive" data-testid={`text-amount-${payment.id}`}>
-                              ${parseFloat(payment.amount).toLocaleString()}
+                              ₹{parseFloat(payment.amount).toLocaleString()}
                             </div>
                             <div className="text-xs text-destructive/70 mt-0.5 font-medium">
                               Since {format(new Date(payment.dueDate), "MMM d")}
@@ -752,13 +752,13 @@ export default function DashboardPage() {
                         </TableCell>
                         <TableCell className="text-sm font-medium">
                           {customer.nextPaymentAmount
-                            ? `$${parseFloat(customer.nextPaymentAmount).toLocaleString()}`
+                            ? `₹${parseFloat(customer.nextPaymentAmount).toLocaleString()}`
                             : "-"}
                         </TableCell>
                         <TableCell>
                           {parseFloat(customer.totalOverdue) > 0 ? (
                             <Badge variant="destructive" className="text-xs">
-                              ${parseFloat(customer.totalOverdue).toLocaleString()}
+                              ₹{parseFloat(customer.totalOverdue).toLocaleString()}
                             </Badge>
                           ) : (
                             <span className="text-sm text-muted-foreground">-</span>

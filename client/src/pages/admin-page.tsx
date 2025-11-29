@@ -575,14 +575,14 @@ export default function AdminPage() {
                             <TableCell>
                               {parseFloat(customer.totalOverdue) > 0 ? (
                                 <Badge variant="destructive">
-                                  ${parseFloat(customer.totalOverdue).toFixed(2)}
+                                  ₹{parseFloat(customer.totalOverdue).toFixed(2)}
                                 </Badge>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
                               )}
                             </TableCell>
                             <TableCell className="text-green-600 dark:text-green-400 font-medium">
-                              ${parseFloat(customer.totalPaid).toFixed(2)}
+                              ₹{parseFloat(customer.totalPaid).toFixed(2)}
                             </TableCell>
                           </TableRow>
                         ))}

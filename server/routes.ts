@@ -301,6 +301,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/purchases/:id", requireAuth, async (req, res) => {
+    try {
+      const deleted = await storage.deletePurchase(req.params.id, req.user!.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Purchase not found or unauthorized" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.patch("/api/payments/:id", requireAuth, async (req, res) => {
     try {
       const payment = await storage.getPayment(req.params.id);

@@ -14,7 +14,7 @@ import {
   type ActivityLogEntry,
   type UserWithStats,
 } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { randomUUID, scryptSync, randomBytes } from "crypto";
 import session from "express-session";
 import Database from "better-sqlite3";
 // @ts-ignore - no type definitions available
@@ -218,12 +218,10 @@ export class SqliteStorage implements IStorage {
     
     if (userCount === 0) {
       // Create default admin user with pre-hashed password for "admin123"
-      // This hash is generated using scrypt with a fixed salt for reproducibility
-      const { scryptSync, randomBytes } = require('crypto');
       const salt = randomBytes(16).toString("hex");
-      const hashedPassword = scryptSync("admin123", salt, 64).toString("hex") + "." + salt;
+      const hashedPassword = (scryptSync("admin123", salt, 64) as Buffer).toString("hex") + "." + salt;
       
-      const id = require('crypto').randomUUID();
+      const id = randomUUID();
       const now = Date.now();
       
       this.db.prepare(

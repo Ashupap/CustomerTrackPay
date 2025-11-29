@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { DollarSign } from "lucide-react";
+import { IndianRupee } from "lucide-react";
 
 export default function AuthPage() {
   const { user, loginMutation } = useAuth();
@@ -41,7 +41,7 @@ export default function AuthPage() {
             {/* Logo */}
             <div className="flex justify-center mb-8">
               <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg">
-                <DollarSign className="h-8 w-8 text-white" />
+                <IndianRupee className="h-8 w-8 text-white" />
               </div>
             </div>
 

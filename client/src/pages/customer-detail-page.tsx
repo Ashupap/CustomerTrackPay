@@ -5,11 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Plus, Check, Mail, Phone, Building2, IndianRupee, Package, Calendar, Edit2 } from "lucide-react";
+import { ArrowLeft, Plus, Check, Mail, Phone, Building2, IndianRupee, Package, Calendar, Edit2, Trash2 } from "lucide-react";
 import { format, isPast, isFuture, startOfDay } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
@@ -133,6 +144,60 @@ export default function CustomerDetailPage() {
     },
   });
 
+  const deleteCustomerMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/customers/${customerId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0] as string;
+          return key?.startsWith("/api/kpi");
+        }
+      });
+      toast({
+        title: "Customer deleted",
+        description: "Customer and all associated data have been deleted",
+      });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete customer",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePurchaseMutation = useMutation({
+    mutationFn: async (purchaseId: string) => {
+      await apiRequest("DELETE", `/api/purchases/${purchaseId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", customerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0] as string;
+          return key?.startsWith("/api/kpi");
+        }
+      });
+      toast({
+        title: "Purchase deleted",
+        description: "Purchase and all associated payments have been deleted",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete purchase",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const getPaymentStatus = (payment: Payment): "paid" | "overdue" | "upcoming" => {
     if (payment.status === "paid") return "paid";
     // Use startOfDay to normalize dates to midnight for proper comparison
@@ -205,15 +270,49 @@ export default function CustomerDetailPage() {
                   <CardTitle className="text-2xl" data-testid="text-customer-name">{customer.name}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">Customer Information</p>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setLocation(`/customers/${customerId}/edit`)}
-                  data-testid="button-edit-customer"
-                >
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Edit
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setLocation(`/customers/${customerId}/edit`)}
+                    data-testid="button-edit-customer"
+                  >
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        data-testid="button-delete-customer"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{customer.name}"? This will permanently remove the customer 
+                          and all associated purchases and payments. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteCustomerMutation.mutate()}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          data-testid="button-confirm-delete-customer"
+                        >
+                          {deleteCustomerMutation.isPending ? "Deleting..." : "Delete Customer"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -302,14 +401,47 @@ export default function CustomerDetailPage() {
                           </span>
                         </div>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setLocation(`/customers/${customerId}/purchase/${purchase.id}/edit`)}
-                        data-testid={`button-edit-purchase-${purchase.id}`}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setLocation(`/customers/${customerId}/purchase/${purchase.id}/edit`)}
+                          data-testid={`button-edit-purchase-${purchase.id}`}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              data-testid={`button-delete-purchase-${purchase.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Purchase</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete the purchase for "{purchase.product}"? This will 
+                                permanently remove the purchase and all associated payments. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deletePurchaseMutation.mutate(purchase.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                data-testid={`button-confirm-delete-purchase-${purchase.id}`}
+                              >
+                                {deletePurchaseMutation.isPending ? "Deleting..." : "Delete Purchase"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>

@@ -50,6 +50,7 @@ export interface IStorage {
   getPurchasesByCustomer(customerId: string): Promise<Purchase[]>;
   createPurchase(purchase: InsertPurchase, userId: string): Promise<Purchase>;
   updatePurchase(id: string, purchase: Partial<InsertPurchase>): Promise<Purchase | undefined>;
+  deletePurchase(id: string, userId: string): Promise<boolean>;
   
   // Payment management
   getPayment(id: string): Promise<Payment | undefined>;
@@ -701,6 +702,25 @@ export class SqliteStorage implements IStorage {
     ).run(...updateValues);
 
     return await this.getPurchase(id);
+  }
+
+  async deletePurchase(id: string, userId: string): Promise<boolean> {
+    // Verify the purchase belongs to the user's customer
+    const purchase = await this.getPurchase(id);
+    if (!purchase) return false;
+    
+    const customer = this.db.prepare(
+      "SELECT user_id FROM customers WHERE id = ?"
+    ).get(purchase.customerId) as any;
+    
+    if (!customer || customer.user_id !== userId) return false;
+    
+    // Delete associated payments first
+    this.db.prepare("DELETE FROM payments WHERE purchase_id = ?").run(id);
+    
+    // Delete the purchase
+    const result = this.db.prepare("DELETE FROM purchases WHERE id = ?").run(id);
+    return result.changes > 0;
   }
 
   async getPayment(id: string): Promise<Payment | undefined> {

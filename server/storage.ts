@@ -208,6 +208,30 @@ export class SqliteStorage implements IStorage {
     
     // Update existing admin user to have admin role
     this.db.exec("UPDATE users SET role = 'admin' WHERE username = 'admin'");
+    
+    // Create default admin user if no users exist
+    this.ensureDefaultAdmin();
+  }
+  
+  private ensureDefaultAdmin() {
+    const userCount = (this.db.prepare("SELECT COUNT(*) as count FROM users").get() as any)?.count || 0;
+    
+    if (userCount === 0) {
+      // Create default admin user with pre-hashed password for "admin123"
+      // This hash is generated using scrypt with a fixed salt for reproducibility
+      const { scryptSync, randomBytes } = require('crypto');
+      const salt = randomBytes(16).toString("hex");
+      const hashedPassword = scryptSync("admin123", salt, 64).toString("hex") + "." + salt;
+      
+      const id = require('crypto').randomUUID();
+      const now = Date.now();
+      
+      this.db.prepare(
+        "INSERT INTO users (id, username, password, role, created_at) VALUES (?, ?, ?, ?, ?)"
+      ).run(id, "admin", hashedPassword, "admin", now);
+      
+      console.log("Default admin user created (username: admin, password: admin123)");
+    }
   }
 
   async getUser(id: string): Promise<User | undefined> {

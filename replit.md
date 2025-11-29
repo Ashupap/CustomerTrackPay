@@ -32,6 +32,7 @@ PayTrack is a comprehensive customer payment tracking web application designed t
     - Activity Log: Track all user actions (customer creation, purchase creation, payment marking)
     - All Customers View: Overview of all customers across all users with payment status
 -   **Activity Tracking**: Every action (creating customers, purchases, marking payments) is tracked with the user who performed it
+-   **User Self-Service Password Change**: Users can change their own password through a dialog in the dashboard header (requires current password verification)
 -   **Dark Mode**: Full support with system-wide theme toggle and persistence.
 -   **Authentication & Security**: Scrypt hashing, session-based authentication, protected routes, minimal login page.
 -   **Dashboard**: KPI cards (Total Payments Received, Total Overdue), searchable customer table with status filters and quick payment views. Global "Add Purchase" action and individual quick-add purchase buttons for each customer. Admin users see an "Admin" button to access the admin panel.

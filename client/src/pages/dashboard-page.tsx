@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DollarSign, AlertCircle, Plus, Search, LogOut, Upload, CheckCircle, XCircle, Edit2, Mail, Phone, ShoppingCart } from "lucide-react";
+import { DollarSign, AlertCircle, Plus, Search, LogOut, Upload, CheckCircle, XCircle, Edit2, Mail, Phone, ShoppingCart, Shield } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -69,6 +69,10 @@ export default function DashboardPage() {
 
   const { data: overdueData } = useQuery<{ count: number }>({
     queryKey: ["/api/payments/overdue-count"],
+  });
+
+  const { data: roleData } = useQuery<{ role: string; isAdmin: boolean }>({
+    queryKey: ["/api/user/role"],
   });
 
   const filteredCustomers = customers?.filter((customer) => {
@@ -152,6 +156,17 @@ export default function DashboardPage() {
               <span className="text-sm text-muted-foreground" data-testid="text-username">
                 {user?.username}
               </span>
+              {roleData?.isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLocation("/admin")}
+                  data-testid="button-admin"
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Admin</span>
+                </Button>
+              )}
               <ThemeToggle />
               <Button
                 variant="outline"
@@ -160,7 +175,7 @@ export default function DashboardPage() {
                 data-testid="button-logout"
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                Logout
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>

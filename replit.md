@@ -17,15 +17,24 @@ PayTrack is a comprehensive customer payment tracking web application designed t
 **Shared**: Zod schemas for validation, Drizzle-zod.
 
 ### Data Model
--   **Users**: For authentication and management.
--   **Customers**: Client information linked to users, with multiple purchases.
--   **Purchases**: Rental transaction records including initial and recurring rental amounts, and frequency. Automatically generates payment schedules.
--   **Payments**: Individual payment records with amount, due date, and status (paid/upcoming/overdue).
+-   **Users**: Authentication and management with role-based access control (admin/user roles). Includes `createdAt` and `createdBy` tracking.
+-   **Customers**: Client information linked to users, with multiple purchases. Includes `createdBy` for activity tracking.
+-   **Purchases**: Rental transaction records including initial and recurring rental amounts, and frequency. Includes `createdBy` for activity tracking. Automatically generates payment schedules.
+-   **Payments**: Individual payment records with amount, due date, and status (paid/upcoming/overdue). Includes `createdBy` and `markedPaidBy` for full audit trail.
 
 ### Key Features
+-   **Multi-User Support with Role-Based Access Control**: 
+    - **Admin Role**: Full system access, can view all customers/transactions, manage users, reset passwords, view activity logs
+    - **User Role**: Standard access to their own customers, purchases, and payments
+    - Default admin credentials: username `admin`, password `admin123`
+-   **Admin Panel** (`/admin`): 
+    - User Management: Create, delete users, reset passwords
+    - Activity Log: Track all user actions (customer creation, purchase creation, payment marking)
+    - All Customers View: Overview of all customers across all users with payment status
+-   **Activity Tracking**: Every action (creating customers, purchases, marking payments) is tracked with the user who performed it
 -   **Dark Mode**: Full support with system-wide theme toggle and persistence.
 -   **Authentication & Security**: Scrypt hashing, session-based authentication, protected routes, minimal login page.
--   **Dashboard**: KPI cards (Total Payments Received, Total Overdue), searchable customer table with status filters and quick payment views. Global "Add Purchase" action and individual quick-add purchase buttons for each customer.
+-   **Dashboard**: KPI cards (Total Payments Received, Total Overdue), searchable customer table with status filters and quick payment views. Global "Add Purchase" action and individual quick-add purchase buttons for each customer. Admin users see an "Admin" button to access the admin panel.
 -   **Customer Management**: CRUD operations for customers, viewing purchase and payment history.
 -   **Purchase & Payment Tracking**: Creation of rental purchases with automated payment schedule generation based on flexible frequencies (monthly/quarterly/yearly/one-time), visual payment timelines, and one-click status updates. Supports both global purchase creation (with customer selection) and customer-specific purchase creation.
 -   **Payment Schedule Calculation**: Automated calculation of initial and recurring payments, including overdue detection.

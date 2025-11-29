@@ -11,12 +11,14 @@ import DashboardPage from "@/pages/dashboard-page";
 import CustomerDetailPage from "@/pages/customer-detail-page";
 import CustomerFormPage from "@/pages/customer-form-page";
 import PurchaseFormPage from "@/pages/purchase-form-page";
+import AdminPage from "@/pages/admin-page";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <ProtectedRoute path="/" component={DashboardPage} />
+      <ProtectedRoute path="/admin" component={AdminPage} />
       <ProtectedRoute path="/customers/new" component={CustomerFormPage} />
       <ProtectedRoute path="/customers/:id" component={CustomerDetailPage} />
       <ProtectedRoute path="/customers/:id/edit" component={CustomerFormPage} />

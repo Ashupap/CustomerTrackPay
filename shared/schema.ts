@@ -1,14 +1,14 @@
-import { pgTable, text, integer, timestamp, varchar } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
 
-export const users = pgTable("users", {
+export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("user"), // 'admin' or 'user'
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   createdBy: text("created_by"), // null for first admin, otherwise admin who created
 });
 
@@ -34,14 +34,14 @@ export type User = typeof users.$inferSelect;
 // Safe user type without password for frontend
 export type SafeUser = Omit<User, "password">;
 
-export const customers = pgTable("customers", {
+export const customers = sqliteTable("customers", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(), // Owner user
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
   company: text("company"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   createdBy: text("created_by").notNull(), // User who created this entry
 });
 
@@ -126,9 +126,8 @@ export type ActivityLogEntry = {
   type: 'customer_created' | 'purchase_created' | 'payment_marked_paid' | 'customer_updated' | 'purchase_updated' | 'payment_updated';
   entityId: string;
   entityName: string;
-  userId: string;
-  username: string;
-  details: string;
+  createdById: string | null;
+  createdByUsername: string;
   createdAt: Date;
 };
 

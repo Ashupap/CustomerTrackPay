@@ -1,6 +1,8 @@
 import {
   type User,
   type InsertUser,
+  type CreateUser,
+  type SafeUser,
   type Customer,
   type InsertCustomer,
   type Purchase,
@@ -9,6 +11,8 @@ import {
   type InsertPayment,
   type CustomerSummary,
   type CustomerWithPurchases,
+  type ActivityLogEntry,
+  type UserWithStats,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import session from "express-session";
@@ -19,30 +23,47 @@ import SqliteStore from "better-sqlite3-session-store";
 const SessionStore = SqliteStore(session);
 
 export interface IStorage {
+  // User management
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
+  // Admin user management
+  getAllUsers(): Promise<SafeUser[]>;
+  getUsersWithStats(): Promise<UserWithStats[]>;
+  createUserByAdmin(user: CreateUser, adminId: string): Promise<SafeUser>;
+  deleteUser(id: string): Promise<boolean>;
+  resetUserPassword(id: string, newPassword: string): Promise<boolean>;
+  isAdmin(userId: string): Promise<boolean>;
+  
+  // Customer management
   getCustomer(id: string, userId: string): Promise<Customer | undefined>;
   getCustomers(userId: string): Promise<CustomerSummary[]>;
+  getAllCustomers(): Promise<CustomerSummary[]>; // Admin only
   getCustomerWithPurchases(id: string, userId: string): Promise<CustomerWithPurchases | undefined>;
   createCustomer(customer: InsertCustomer, userId: string): Promise<Customer>;
   updateCustomer(id: string, customer: InsertCustomer, userId: string): Promise<Customer | undefined>;
   deleteCustomer(id: string, userId: string): Promise<boolean>;
   
+  // Purchase management
   getPurchase(id: string): Promise<Purchase | undefined>;
   getPurchasesByCustomer(customerId: string): Promise<Purchase[]>;
-  createPurchase(purchase: InsertPurchase): Promise<Purchase>;
+  createPurchase(purchase: InsertPurchase, userId: string): Promise<Purchase>;
   updatePurchase(id: string, purchase: Partial<InsertPurchase>): Promise<Purchase | undefined>;
   
+  // Payment management
   getPayment(id: string): Promise<Payment | undefined>;
   getPaymentsByPurchase(purchaseId: string): Promise<Payment[]>;
   getUpcomingPayments(userId: string, daysAhead: number): Promise<any[]>;
   getThisMonthUpcomingPayments(userId: string): Promise<any[]>;
   getOverduePaymentsCount(userId: string): Promise<number>;
   getOverduePayments(userId: string): Promise<any[]>;
-  createPayment(payment: InsertPayment): Promise<Payment>;
+  createPayment(payment: InsertPayment, userId: string): Promise<Payment>;
   updatePayment(id: string, payment: Partial<InsertPayment>): Promise<Payment | undefined>;
+  markPaymentPaid(id: string, userId: string): Promise<Payment | undefined>;
+  
+  // Admin activity tracking
+  getActivityLog(limit?: number): Promise<ActivityLogEntry[]>;
   
   sessionStore: any;
 }
@@ -68,11 +89,15 @@ export class SqliteStorage implements IStorage {
   }
 
   private initializeDatabase() {
+    // Create tables with new schema
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         username TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+        created_by TEXT
       );
 
       CREATE TABLE IF NOT EXISTS customers (
@@ -82,7 +107,8 @@ export class SqliteStorage implements IStorage {
         email TEXT,
         phone TEXT,
         company TEXT,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        created_by TEXT NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS purchases (
@@ -93,7 +119,8 @@ export class SqliteStorage implements IStorage {
         initial_payment TEXT NOT NULL,
         rental_amount TEXT NOT NULL,
         rental_frequency TEXT NOT NULL,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        created_by TEXT NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS payments (
@@ -103,28 +130,120 @@ export class SqliteStorage implements IStorage {
         due_date INTEGER NOT NULL,
         status TEXT NOT NULL,
         paid_date INTEGER,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        created_by TEXT NOT NULL,
+        marked_paid_by TEXT
       );
     `);
+    
+    // Migrate existing tables by adding new columns if they don't exist
+    this.migrateDatabase();
+  }
+  
+  private migrateDatabase() {
+    const now = Date.now();
+    
+    // Check if columns exist and add them if not
+    const userColumns = this.db.prepare("PRAGMA table_info(users)").all() as any[];
+    const hasRole = userColumns.some(col => col.name === 'role');
+    const hasUserCreatedAt = userColumns.some(col => col.name === 'created_at');
+    const hasUserCreatedBy = userColumns.some(col => col.name === 'created_by');
+    
+    if (!hasRole) {
+      this.db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
+      this.db.exec("UPDATE users SET role = 'user' WHERE role IS NULL");
+    }
+    if (!hasUserCreatedAt) {
+      this.db.exec("ALTER TABLE users ADD COLUMN created_at INTEGER");
+      this.db.prepare("UPDATE users SET created_at = ? WHERE created_at IS NULL").run(now);
+    }
+    if (!hasUserCreatedBy) {
+      this.db.exec("ALTER TABLE users ADD COLUMN created_by TEXT");
+    }
+    
+    // Check customers table
+    const customerColumns = this.db.prepare("PRAGMA table_info(customers)").all() as any[];
+    const hasCustomerCreatedBy = customerColumns.some(col => col.name === 'created_by');
+    
+    if (!hasCustomerCreatedBy) {
+      // For existing customers, set created_by to user_id
+      this.db.exec("ALTER TABLE customers ADD COLUMN created_by TEXT");
+      this.db.exec("UPDATE customers SET created_by = user_id WHERE created_by IS NULL");
+    }
+    
+    // Check purchases table
+    const purchaseColumns = this.db.prepare("PRAGMA table_info(purchases)").all() as any[];
+    const hasPurchaseCreatedBy = purchaseColumns.some(col => col.name === 'created_by');
+    
+    if (!hasPurchaseCreatedBy) {
+      this.db.exec("ALTER TABLE purchases ADD COLUMN created_by TEXT");
+      // Set existing purchases created_by from customer's user_id
+      this.db.exec(`
+        UPDATE purchases SET created_by = (
+          SELECT c.user_id FROM customers c WHERE c.id = purchases.customer_id
+        ) WHERE created_by IS NULL
+      `);
+    }
+    
+    // Check payments table
+    const paymentColumns = this.db.prepare("PRAGMA table_info(payments)").all() as any[];
+    const hasPaymentCreatedBy = paymentColumns.some(col => col.name === 'created_by');
+    const hasMarkedPaidBy = paymentColumns.some(col => col.name === 'marked_paid_by');
+    
+    if (!hasPaymentCreatedBy) {
+      this.db.exec("ALTER TABLE payments ADD COLUMN created_by TEXT");
+      // Set existing payments created_by from purchase's customer's user_id
+      this.db.exec(`
+        UPDATE payments SET created_by = (
+          SELECT c.user_id FROM purchases p 
+          JOIN customers c ON c.id = p.customer_id 
+          WHERE p.id = payments.purchase_id
+        ) WHERE created_by IS NULL
+      `);
+    }
+    
+    if (!hasMarkedPaidBy) {
+      this.db.exec("ALTER TABLE payments ADD COLUMN marked_paid_by TEXT");
+    }
+    
+    // Update existing admin user to have admin role
+    this.db.exec("UPDATE users SET role = 'admin' WHERE username = 'admin'");
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    const row = this.db.prepare("SELECT * FROM users WHERE id = ?").get(id);
-    return row as User | undefined;
+    const row = this.db.prepare("SELECT * FROM users WHERE id = ?").get(id) as any;
+    if (!row) return undefined;
+    return {
+      ...row,
+      createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+      createdBy: row.created_by,
+    };
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const row = this.db.prepare("SELECT * FROM users WHERE username = ?").get(username);
-    return row as User | undefined;
+    const row = this.db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
+    if (!row) return undefined;
+    return {
+      ...row,
+      createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+      createdBy: row.created_by,
+    };
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
+    const createdAt = new Date();
+    const user: User = { 
+      ...insertUser, 
+      id, 
+      role: 'user',
+      createdAt,
+      createdBy: null,
+    };
     
     try {
-      this.db.prepare("INSERT INTO users (id, username, password) VALUES (?, ?, ?)")
-        .run(user.id, user.username, user.password);
+      this.db.prepare("INSERT INTO users (id, username, password, role, created_at) VALUES (?, ?, ?, ?, ?)")
+        .run(user.id, user.username, user.password, user.role, createdAt.getTime());
     } catch (error: any) {
       if (error.message?.includes('UNIQUE constraint failed')) {
         throw new Error('Username already exists');
@@ -133,6 +252,88 @@ export class SqliteStorage implements IStorage {
     }
     
     return user;
+  }
+  
+  // Admin methods
+  async getAllUsers(): Promise<SafeUser[]> {
+    const rows = this.db.prepare("SELECT id, username, role, created_at, created_by FROM users ORDER BY created_at DESC").all() as any[];
+    return rows.map(row => ({
+      id: row.id,
+      username: row.username,
+      role: row.role || 'user',
+      createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+      createdBy: row.created_by,
+    }));
+  }
+  
+  async getUsersWithStats(): Promise<UserWithStats[]> {
+    const users = await this.getAllUsers();
+    
+    const result: UserWithStats[] = [];
+    for (const user of users) {
+      const customersCreated = (this.db.prepare("SELECT COUNT(*) as count FROM customers WHERE created_by = ?").get(user.id) as any)?.count || 0;
+      const purchasesCreated = (this.db.prepare("SELECT COUNT(*) as count FROM purchases WHERE created_by = ?").get(user.id) as any)?.count || 0;
+      const paymentsMarked = (this.db.prepare("SELECT COUNT(*) as count FROM payments WHERE marked_paid_by = ?").get(user.id) as any)?.count || 0;
+      
+      result.push({
+        ...user,
+        customersCreated,
+        purchasesCreated,
+        paymentsMarked,
+      });
+    }
+    
+    return result;
+  }
+  
+  async createUserByAdmin(createUser: CreateUser, adminId: string): Promise<SafeUser> {
+    const id = randomUUID();
+    const createdAt = new Date();
+    
+    try {
+      this.db.prepare("INSERT INTO users (id, username, password, role, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(id, createUser.username, createUser.password, createUser.role, createdAt.getTime(), adminId);
+    } catch (error: any) {
+      if (error.message?.includes('UNIQUE constraint failed')) {
+        throw new Error('Username already exists');
+      }
+      throw error;
+    }
+    
+    return {
+      id,
+      username: createUser.username,
+      role: createUser.role,
+      createdAt,
+      createdBy: adminId,
+    };
+  }
+  
+  async deleteUser(id: string): Promise<boolean> {
+    const user = await this.getUser(id);
+    if (!user) return false;
+    
+    // Don't allow deleting the last admin
+    const adminCount = (this.db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'").get() as any)?.count || 0;
+    if (user.role === 'admin' && adminCount <= 1) {
+      throw new Error('Cannot delete the last admin user');
+    }
+    
+    this.db.prepare("DELETE FROM users WHERE id = ?").run(id);
+    return true;
+  }
+  
+  async resetUserPassword(id: string, newPassword: string): Promise<boolean> {
+    const user = await this.getUser(id);
+    if (!user) return false;
+    
+    this.db.prepare("UPDATE users SET password = ? WHERE id = ?").run(newPassword, id);
+    return true;
+  }
+  
+  async isAdmin(userId: string): Promise<boolean> {
+    const user = await this.getUser(userId);
+    return user?.role === 'admin';
   }
 
   async getCustomer(id: string, userId: string): Promise<Customer | undefined> {
@@ -145,6 +346,21 @@ export class SqliteStorage implements IStorage {
       ...row,
       userId: row.user_id,
       createdAt: new Date(row.created_at),
+      createdBy: row.created_by || row.user_id,
+    };
+  }
+  
+  async getCustomerById(id: string): Promise<Customer | undefined> {
+    const row = this.db.prepare("SELECT * FROM customers WHERE id = ?")
+      .get(id) as any;
+    
+    if (!row) return undefined;
+    
+    return {
+      ...row,
+      userId: row.user_id,
+      createdAt: new Date(row.created_at),
+      createdBy: row.created_by || row.user_id,
     };
   }
 
@@ -159,6 +375,7 @@ export class SqliteStorage implements IStorage {
         ...row,
         userId: row.user_id,
         createdAt: new Date(row.created_at),
+        createdBy: row.created_by || row.user_id,
       };
 
       const purchases = this.db.prepare("SELECT * FROM purchases WHERE customer_id = ?")
@@ -255,10 +472,11 @@ export class SqliteStorage implements IStorage {
       phone: insertCustomer.phone ?? null,
       company: insertCustomer.company ?? null,
       createdAt,
+      createdBy: userId,
     };
 
     this.db.prepare(
-      "INSERT INTO customers (id, user_id, name, email, phone, company, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO customers (id, user_id, name, email, phone, company, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       customer.id,
       customer.userId,
@@ -266,10 +484,66 @@ export class SqliteStorage implements IStorage {
       customer.email,
       customer.phone,
       customer.company,
-      createdAt.getTime()
+      createdAt.getTime(),
+      userId
     );
 
     return customer;
+  }
+  
+  async getAllCustomers(): Promise<CustomerSummary[]> {
+    const rows = this.db.prepare("SELECT * FROM customers ORDER BY created_at DESC")
+      .all() as any[];
+
+    const summaries: CustomerSummary[] = [];
+
+    for (const row of rows) {
+      const customer: Customer = {
+        ...row,
+        userId: row.user_id,
+        createdAt: new Date(row.created_at),
+        createdBy: row.created_by || row.user_id,
+      };
+
+      const purchases = this.db.prepare("SELECT * FROM purchases WHERE customer_id = ?")
+        .all(customer.id) as any[];
+
+      let nextPaymentDate: string | null = null;
+      let nextPaymentAmount: string | null = null;
+      let totalOverdue = 0;
+      let totalPaid = 0;
+
+      for (const purchase of purchases) {
+        const payments = this.db.prepare("SELECT * FROM payments WHERE purchase_id = ? ORDER BY due_date ASC")
+          .all(purchase.id) as any[];
+
+        for (const payment of payments) {
+          if (payment.status === "paid") {
+            totalPaid += parseFloat(payment.amount);
+          } else {
+            const dueDate = new Date(payment.due_date);
+            const now = new Date();
+            
+            if (dueDate < now) {
+              totalOverdue += parseFloat(payment.amount);
+            } else if (!nextPaymentDate || dueDate < new Date(nextPaymentDate)) {
+              nextPaymentDate = new Date(payment.due_date).toISOString();
+              nextPaymentAmount = payment.amount;
+            }
+          }
+        }
+      }
+
+      summaries.push({
+        ...customer,
+        nextPaymentDate,
+        nextPaymentAmount,
+        totalOverdue: totalOverdue.toString(),
+        totalPaid: totalPaid.toString(),
+      });
+    }
+
+    return summaries;
   }
 
   async updateCustomer(id: string, insertCustomer: InsertCustomer, userId: string): Promise<Customer | undefined> {
@@ -315,6 +589,7 @@ export class SqliteStorage implements IStorage {
       rentalAmount: row.rental_amount,
       rentalFrequency: row.rental_frequency,
       createdAt: new Date(row.created_at),
+      createdBy: row.created_by,
     };
   }
 
@@ -329,10 +604,11 @@ export class SqliteStorage implements IStorage {
       rentalAmount: row.rental_amount,
       rentalFrequency: row.rental_frequency,
       createdAt: new Date(row.created_at),
+      createdBy: row.created_by,
     }));
   }
 
-  async createPurchase(insertPurchase: InsertPurchase): Promise<Purchase> {
+  async createPurchase(insertPurchase: InsertPurchase, userId: string): Promise<Purchase> {
     const id = randomUUID();
     const purchaseDate = typeof insertPurchase.purchaseDate === 'string' 
       ? new Date(insertPurchase.purchaseDate)
@@ -344,10 +620,11 @@ export class SqliteStorage implements IStorage {
       id,
       purchaseDate,
       createdAt,
+      createdBy: userId,
     };
 
     this.db.prepare(
-      "INSERT INTO purchases (id, customer_id, product, purchase_date, initial_payment, rental_amount, rental_frequency, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO purchases (id, customer_id, product, purchase_date, initial_payment, rental_amount, rental_frequency, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       purchase.id,
       purchase.customerId,
@@ -356,7 +633,8 @@ export class SqliteStorage implements IStorage {
       purchase.initialPayment,
       purchase.rentalAmount,
       purchase.rentalFrequency,
-      createdAt.getTime()
+      createdAt.getTime(),
+      userId
     );
 
     return purchase;
@@ -413,6 +691,8 @@ export class SqliteStorage implements IStorage {
       dueDate: new Date(row.due_date),
       paidDate: row.paid_date ? new Date(row.paid_date) : null,
       createdAt: new Date(row.created_at),
+      createdBy: row.created_by,
+      markedPaidBy: row.marked_paid_by,
     };
   }
 
@@ -426,10 +706,12 @@ export class SqliteStorage implements IStorage {
       dueDate: new Date(row.due_date),
       paidDate: row.paid_date ? new Date(row.paid_date) : null,
       createdAt: new Date(row.created_at),
+      createdBy: row.created_by,
+      markedPaidBy: row.marked_paid_by,
     }));
   }
 
-  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+  async createPayment(insertPayment: InsertPayment, userId: string): Promise<Payment> {
     const id = randomUUID();
     const dueDate = typeof insertPayment.dueDate === 'string'
       ? new Date(insertPayment.dueDate)
@@ -447,10 +729,12 @@ export class SqliteStorage implements IStorage {
       dueDate,
       paidDate,
       createdAt,
+      createdBy: userId,
+      markedPaidBy: paidDate ? userId : null,
     };
 
     this.db.prepare(
-      "INSERT INTO payments (id, purchase_id, amount, due_date, status, paid_date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO payments (id, purchase_id, amount, due_date, status, paid_date, created_at, created_by, marked_paid_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       payment.id,
       payment.purchaseId,
@@ -458,10 +742,30 @@ export class SqliteStorage implements IStorage {
       dueDate.getTime(),
       payment.status,
       paidDate ? paidDate.getTime() : null,
-      createdAt.getTime()
+      createdAt.getTime(),
+      userId,
+      paidDate ? userId : null
     );
 
     return payment;
+  }
+  
+  async markPaymentPaid(id: string, userId: string): Promise<Payment | undefined> {
+    const existing = await this.getPayment(id);
+    if (!existing) return undefined;
+    
+    const paidDate = new Date();
+    
+    this.db.prepare(
+      "UPDATE payments SET status = 'paid', paid_date = ?, marked_paid_by = ? WHERE id = ?"
+    ).run(paidDate.getTime(), userId, id);
+    
+    return {
+      ...existing,
+      status: 'paid',
+      paidDate,
+      markedPaidBy: userId,
+    };
   }
 
   async updatePayment(id: string, updates: Partial<InsertPayment>): Promise<Payment | undefined> {
@@ -621,6 +925,100 @@ export class SqliteStorage implements IStorage {
       phone: row.phone,
       customerId: row.customer_id,
     }));
+  }
+  
+  async getActivityLog(limit: number = 50): Promise<ActivityLogEntry[]> {
+    const entries: ActivityLogEntry[] = [];
+    
+    // Get customer creation activities
+    const customerRows = this.db.prepare(`
+      SELECT 
+        c.id,
+        c.name,
+        c.created_at,
+        c.created_by,
+        u.username as created_by_username
+      FROM customers c
+      LEFT JOIN users u ON c.created_by = u.id
+      ORDER BY c.created_at DESC
+      LIMIT ?
+    `).all(limit) as any[];
+    
+    for (const row of customerRows) {
+      entries.push({
+        id: `customer-${row.id}`,
+        type: 'customer_created',
+        entityId: row.id,
+        entityName: row.name,
+        createdAt: new Date(row.created_at),
+        createdById: row.created_by,
+        createdByUsername: row.created_by_username || 'Unknown',
+      });
+    }
+    
+    // Get purchase creation activities
+    const purchaseRows = this.db.prepare(`
+      SELECT 
+        p.id,
+        p.product,
+        p.created_at,
+        p.created_by,
+        u.username as created_by_username,
+        c.name as customer_name
+      FROM purchases p
+      LEFT JOIN users u ON p.created_by = u.id
+      LEFT JOIN customers c ON p.customer_id = c.id
+      ORDER BY p.created_at DESC
+      LIMIT ?
+    `).all(limit) as any[];
+    
+    for (const row of purchaseRows) {
+      entries.push({
+        id: `purchase-${row.id}`,
+        type: 'purchase_created',
+        entityId: row.id,
+        entityName: `${row.product} for ${row.customer_name}`,
+        createdAt: new Date(row.created_at),
+        createdById: row.created_by,
+        createdByUsername: row.created_by_username || 'Unknown',
+      });
+    }
+    
+    // Get payment marked paid activities
+    const paymentRows = this.db.prepare(`
+      SELECT 
+        py.id,
+        py.amount,
+        py.paid_date,
+        py.marked_paid_by,
+        u.username as marked_by_username,
+        pur.product,
+        c.name as customer_name
+      FROM payments py
+      LEFT JOIN users u ON py.marked_paid_by = u.id
+      LEFT JOIN purchases pur ON py.purchase_id = pur.id
+      LEFT JOIN customers c ON pur.customer_id = c.id
+      WHERE py.status = 'paid' AND py.marked_paid_by IS NOT NULL
+      ORDER BY py.paid_date DESC
+      LIMIT ?
+    `).all(limit) as any[];
+    
+    for (const row of paymentRows) {
+      entries.push({
+        id: `payment-${row.id}`,
+        type: 'payment_marked_paid',
+        entityId: row.id,
+        entityName: `$${row.amount} - ${row.product} for ${row.customer_name}`,
+        createdAt: row.paid_date ? new Date(row.paid_date) : new Date(),
+        createdById: row.marked_paid_by,
+        createdByUsername: row.marked_by_username || 'Unknown',
+      });
+    }
+    
+    // Sort all entries by date descending and limit
+    return entries
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit);
   }
 }
 

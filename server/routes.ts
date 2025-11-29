@@ -1,14 +1,25 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth } from "./auth";
+import { setupAuth, hashPassword } from "./auth";
 import { storage } from "./storage";
-import { insertCustomerSchema, insertPurchaseSchema, type InsertPayment } from "@shared/schema";
+import { insertCustomerSchema, insertPurchaseSchema, createUserSchema, type InsertPayment } from "@shared/schema";
 import { addMonths, addYears, startOfMonth, startOfYear, startOfDay } from "date-fns";
 import Papa from "papaparse";
 
 function requireAuth(req: any, res: any, next: any) {
   if (!req.isAuthenticated()) {
     return res.sendStatus(401);
+  }
+  next();
+}
+
+async function requireAdmin(req: any, res: any, next: any) {
+  if (!req.isAuthenticated()) {
+    return res.sendStatus(401);
+  }
+  const isAdmin = await storage.isAdmin(req.user!.id);
+  if (!isAdmin) {
+    return res.status(403).json({ message: "Admin access required" });
   }
   next();
 }
@@ -234,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Customer not found" });
       }
 
-      const purchase = await storage.createPurchase(validated);
+      const purchase = await storage.createPurchase(validated, req.user!.id);
       
       // Parse date as local date, not UTC
       // Ensure we create a Date at midnight in the local timezone
@@ -254,7 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createPayment({
           purchaseId: purchase.id,
           ...paymentData,
-        });
+        }, req.user!.id);
       }
 
       res.status(201).json(purchase);
@@ -340,10 +351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
-      const updated = await storage.updatePayment(req.params.id, {
-        status: "paid",
-        paidDate: new Date(),
-      });
+      const updated = await storage.markPaymentPaid(req.params.id, req.user!.id);
 
       res.json(updated);
     } catch (error: any) {
@@ -427,6 +435,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const count = await storage.getOverduePaymentsCount(req.user!.id);
       res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin routes
+  app.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getUsersWithStats();
+      res.json(users);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const validated = createUserSchema.parse(req.body);
+      const hashedPassword = await hashPassword(validated.password);
+      const user = await storage.createUserByAdmin(
+        { ...validated, password: hashedPassword },
+        req.user!.id
+      );
+      res.status(201).json(user);
+    } catch (error: any) {
+      if (error.message === 'Username already exists') {
+        return res.status(409).json({ message: error.message });
+      }
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
+    try {
+      // Can't delete yourself
+      if (req.params.id === req.user!.id) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+      
+      const deleted = await storage.deleteUser(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.sendStatus(204);
+    } catch (error: any) {
+      if (error.message === 'Cannot delete the last admin user') {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/users/:id/reset-password", requireAdmin, async (req, res) => {
+    try {
+      const { newPassword } = req.body;
+      if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+      
+      const hashedPassword = await hashPassword(newPassword);
+      const updated = await storage.resetUserPassword(req.params.id, hashedPassword);
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ message: "Password reset successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/activity", requireAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const activities = await storage.getActivityLog(limit);
+      res.json(activities);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/customers", requireAdmin, async (req, res) => {
+    try {
+      const customers = await storage.getAllCustomers();
+      res.json(customers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Add route to check if current user is admin
+  app.get("/api/user/role", requireAuth, async (req, res) => {
+    try {
+      const isAdmin = await storage.isAdmin(req.user!.id);
+      res.json({ role: isAdmin ? 'admin' : 'user', isAdmin });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
